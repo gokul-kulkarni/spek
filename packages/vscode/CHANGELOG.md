@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.17.0
+
+**Highlight: search finds what is actually there.** spek implemented search four times — the web server, the VS Code host, the IntelliJ server and the static build — and the four answered the same query differently. The host carried a verbatim copy of the web server's index, which scored an exact match out of the results once it sat more than about 40 characters into a file, so search was effectively blind past the first line of anything. The rule is now stated once, and every surface runs it.
+
+- **A term that appears verbatim is found, wherever it sits in the file** ([#51](https://github.com/spekhq/spek/issues/51)). The fuzzy index ranked a match by its distance from the start of the document and discarded anything further in. Typo tolerance is gone with it: matching is now exact and case-insensitive
+- **A change is found by its own name** — in the form the result card shows it, so a query copied off a result finds that result. The host previously matched file content only
+- **One result per spec and per change**, taken from the file that actually contains the query. A term in three of a change's files used to list it three times, and a name match used to hand back a snippet with nothing the reader typed in it
+- **Each result says which artifact answered and marks archived changes**, so a row explains itself even when there is nothing to highlight in it
+- **Results are ordered the same way as on every other surface**, with the most recently archived change first rather than the oldest
+
 ## 1.16.0
 
 **Highlight: a change's non-Markdown artifacts are visible.** A schema sets each artifact's filename through `generates:`, and not every artifact is Markdown — `event-driven` requires `asyncapi.yaml`. spek discovered only root `*.md` and the `specs/` tree, so such a change rendered every tab except the one its schema asks for.

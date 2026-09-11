@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.17.0
+
+**Highlight: search answers the same query the same way spek's other surfaces do.** spek implemented search four times, and the four disagreed about what is indexed, what counts as a match and how many results one change may produce. The rule is now stated once and mirrored here in Kotlin, with a shared fixture corpus holding the two implementations in agreement.
+
+- **A change is found by the name its result card shows**, so a query copied off a result finds that result
+- **A result comes from the file that actually contains the query.** A name match used to be answered by whichever file came first, handing back a snippet with nothing the reader typed in it
+- **Each result says which artifact answered and marks archived changes**, so a row explains itself even when there is nothing to highlight in it
+- **Results are ordered with the most recently archived change first**, rather than the oldest
+- **A search request with no query is rejected rather than treated as an empty search**, matching the web server
+- **Task text and every root artifact file are indexed** from the same listing the tabs come from
+
 ## 1.16.0
 
 **Highlight: a change's non-Markdown artifacts are visible.** A schema sets each artifact's filename through `generates:`, and not every artifact is Markdown — `event-driven` requires `asyncapi.yaml`. spek discovered only root `*.md` and the `specs/` tree, so such a change rendered every tab except the one its schema asks for.

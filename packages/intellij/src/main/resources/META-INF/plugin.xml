@@ -25,14 +25,15 @@
     ]]></description>
 
     <change-notes><![CDATA[
-        <p><b>1.16.0</b></p>
-        <p><b>A change's non-Markdown artifacts are visible.</b> A schema sets each artifact's filename through <code>generates:</code>, and not every artifact is Markdown &mdash; <code>event-driven</code> requires <code>asyncapi.yaml</code>. spek discovered only root <code>*.md</code> and the <code>specs/</code> tree, so such a change rendered every tab except the one its schema asks for.</p>
+        <p><b>1.17.0</b></p>
+        <p><b>Search answers the same query the same way spek's other surfaces do.</b> spek implemented search four times, and the four disagreed about what is indexed, what counts as a match and how many results one change may produce. The rule is now stated once and mirrored here in Kotlin, with a shared fixture corpus holding the two implementations in agreement.</p>
         <ul>
-            <li><b>Root <code>.yaml</code> / <code>.yml</code> / <code>.json</code> files are artifacts</b>, shown as syntax-highlighted text. The tab is named for the file's stem with a format badge, using the full filename only when a Markdown artifact shares it. Thanks to <a href="https://github.com/nthansen">@nthansen</a> (Norman Hansen), PR #50.</li>
-            <li><b>They sort into their schema position</b>, count in the change-list badge, and are reachable by search.</li>
-            <li><b>Live reload picks them up on filesystems without native change events</b> (devcontainer / WSL / network mounts), where the polling snapshot ignored every extension but <code>.md</code> and <code>.yaml</code>.</li>
-            <li><b>Discovery stays root-only and skips dotfiles</b>, so <code>.openspec.yaml</code> and subdirectory files never become tabs.</li>
-            <li><b>Code fences in <code>proposal.md</code> / <code>design.md</code> are highlighted too.</b> A fence with no language stays plain.</li>
+            <li><b>A change is found by the name its result card shows</b>, so a query copied off a result finds that result.</li>
+            <li><b>A result comes from the file that actually contains the query.</b> A name match used to be answered by whichever file came first, handing back a snippet with nothing the reader typed in it.</li>
+            <li><b>Each result says which artifact answered and marks archived changes</b>, so a row explains itself even when there is nothing to highlight in it.</li>
+            <li><b>Results are ordered with the most recently archived change first</b>, rather than the oldest.</li>
+            <li><b>A search request with no query is rejected rather than treated as an empty search</b>, matching the web server.</li>
+            <li><b>Task text and every root artifact file are indexed</b> from the same listing the tabs come from.</li>
         </ul>
     ]]></change-notes>
 

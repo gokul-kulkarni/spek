@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.17.0
+
+**Highlight: search finds what is actually there.** spek implemented search four times — the web server, the VS Code host, the IntelliJ server and the static build — and the four answered the same query differently. The web index scored an exact match out of the results once it sat more than about 40 characters into a file, so search was effectively blind past the first line of anything; the VS Code host carried a copy of the same defect. The rule is now stated once, and every surface runs it.
+
+- **A term that appears verbatim is found, wherever it sits in the file** ([#51](https://github.com/spekhq/spek/issues/51)). The fuzzy index ranked a match by its distance from the start of the document and discarded anything further in. Typo tolerance is gone with it: matching is now exact and case-insensitive, which is what the other two surfaces already did
+- **Task text is searchable in the static build** ([#52](https://github.com/spekhq/spek/issues/52)). The embedded tasks artifact carried only the parsed checklist, so every word the Tasks tab displays was invisible to search on the GitHub Action's output and the live demo
+- **A change is found by its own name** — in the form the result card shows it, so a query copied off a result finds that result. Previously the web and VS Code surfaces matched file content only
+- **One result per spec and per change**, taken from the file that actually contains the query. A term in three of a change's files used to list it three times, and a name match used to hand back a snippet with nothing the reader typed in it
+- **Each result says which artifact answered and marks archived changes**, so a row explains itself even when there is nothing to highlight in it
+- **Results are ordered the same way everywhere**, with the most recently archived change first rather than the oldest
+- **A malformed search request is answered the same way by both servers.** IntelliJ treated a missing query as an empty one; a repeated `q` crashed the web route
+- *Internal:* `@spekjs/core` 1.12.0 exposes the rule on a browser-safe `@spekjs/core/search` subpath, with a shared fixture corpus holding the TypeScript and Kotlin implementations in agreement
+
 ## 1.16.0
 
 **Highlight: a change's non-Markdown artifacts are visible.** A schema sets each artifact's filename through `generates:`, and not every artifact is Markdown — `event-driven` requires `asyncapi.yaml`. spek discovered only root `*.md` and the `specs/` tree, so such a change rendered every tab except the one its schema asks for.
