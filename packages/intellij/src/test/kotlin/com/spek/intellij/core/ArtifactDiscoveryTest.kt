@@ -7,6 +7,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlin.test.assertNull
 
 class ArtifactDiscoveryTest {
 
@@ -367,5 +368,42 @@ class ArtifactDiscoveryTest {
             results.any { it.type == "change" && it.slug == "add-events" },
             "the change whose asyncapi.yaml holds the match is returned",
         )
+    }
+
+    @Test
+    fun everyRootArtifactCarriesItsSourceFilenameAndTheSpecsTreeCarriesNone() {
+        val repo = mkRepo()
+        val changeDir = writeChange(
+            repo,
+            "c",
+            mapOf(
+                "proposal.md" to "p",
+                "tasks.md" to "- [ ] 1.1 do it",
+                "asyncapi.yaml" to "openapi: 3.0.0",
+                "specs/topic/spec.md" to "delta",
+            ),
+        )
+        val byId = ArtifactDiscovery.discover(changeDir).associateBy { it.id }
+        assertEquals("proposal.md", byId["proposal"]?.file)
+        assertEquals("tasks.md", byId["tasks"]?.file)
+        assertEquals("asyncapi.yaml", byId["asyncapi"]?.file)
+        // The specs artifact is a tree, not a file, so it has no filename to carry.
+        assertNull(byId["specs"]?.file)
+    }
+
+    @Test
+    fun theTasksArtifactCarriesTheFilesRawTextAlongsideItsParsedStructure() {
+        val repo = mkRepo()
+        // A column-0 blockquote is exactly what the parser drops, so it is the line that proves the raw
+        // text is carried rather than reconstructed from the parse.
+        val source = "## Group\n\n- [x] 1.1 done\n\n> a callout the parser does not keep\n"
+        val changeDir = writeChange(repo, "c", mapOf("tasks.md" to source))
+        val tasks = ArtifactDiscovery.discover(changeDir).first()
+
+        assertEquals("tasks", tasks.kind)
+        assertEquals(source, tasks.content)
+        assertEquals(1, tasks.tasks?.total)
+        assertEquals(1, tasks.tasks?.completed)
+        assertFalse(tasks.tasks.toString().contains("callout"))
     }
 }

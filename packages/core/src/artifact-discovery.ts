@@ -39,14 +39,18 @@ function uniqueId(base: string, used: Set<string>): string {
 function buildArtifact(id: string, file: string, kind: RootKind, content: string): ChangeArtifact {
   switch (kind) {
     case "tasks":
-      return { id, title: humanize(stripExt(file)), kind, tasks: parseTasks(content) };
+      // The raw text rides along with the parsed structure. The parser keeps section titles and task text
+      // and drops the rest — column-0 blockquotes, headings, stray prose — so a consumer holding only
+      // `tasks` holds less than the file says, and search over it would answer differently from a host
+      // that reads the file.
+      return { id, title: humanize(stripExt(file)), kind, file, tasks: parseTasks(content), content };
     case "markdown":
-      return { id, title: humanize(stripExt(file)), kind, content };
+      return { id, title: humanize(stripExt(file)), kind, file, content };
     case "data":
       // A data artifact keeps its extension in the title (`asyncapi.yaml`). This is clear, and it does
       // not clash with a markdown tab of the same stem. The frontend derives the fence language from the
       // extension.
-      return { id, title: file, kind, content };
+      return { id, title: file, kind, file, content };
   }
 }
 

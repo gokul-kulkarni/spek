@@ -1,5 +1,12 @@
 export { parseTasks } from "./tasks.js";
 export {
+  searchDocuments,
+  specSearchDocument,
+  changeSearchDocuments,
+  type SearchDocument,
+} from "./search.js";
+export { collectSearchDocuments, searchRepository } from "./search-documents.js";
+export {
   scanOpenSpec,
   scanOpenSpecAggregated,
   readSpec,

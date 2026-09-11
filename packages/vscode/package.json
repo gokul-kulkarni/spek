@@ -118,7 +118,6 @@
     "@spekjs/core": "*",
     "@types/node": "^22.10.0",
     "chokidar": "^5.0.0",
-    "fuse.js": "^7.0.0",
     "typescript": "^5.7.0"
   }
 }

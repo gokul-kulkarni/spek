@@ -1,0 +1,14 @@
+{
+  "name": "dotless-i-does-not-fold-to-ascii-i",
+  "note": "The other direction of the same hazard: U+0131 is its own letter and must not match `i`.",
+  "input": [
+    {
+      "type": "spec",
+      "name": "a",
+      "file": "spec.md",
+      "text": "\u0131ndex of things"
+    }
+  ],
+  "query": "index",
+  "expected": []
+}

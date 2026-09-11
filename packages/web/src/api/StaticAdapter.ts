@@ -14,6 +14,12 @@ import type {
   SchemaReadResult,
   SchemaDefinition,
 } from "@spekjs/core";
+import {
+  changeSearchDocuments,
+  searchDocuments,
+  specSearchDocument,
+  type SearchDocument,
+} from "@spekjs/core/search";
 import type { ApiAdapter, AggregationPrefs } from "./types.js";
 import { getAggregatePref, setAggregatePref } from "../utils/aggregatePref.js";
 import { getJjWorkspacePref, setJjWorkspacePref } from "../utils/jjWorkspacePref.js";
@@ -74,38 +80,17 @@ export class StaticAdapter implements ApiAdapter {
   }
 
   search(query: string): Promise<SearchResult[]> {
-    const q = query.toLowerCase();
-    const results: SearchResult[] = [];
-
-    // 搜尋 specs
+    // The same rule every other surface runs, over documents built from the embedded records rather than
+    // from files. Nothing about matching, ordering, snippets or titles is decided here — the static build
+    // is a surface of spek, not a second search engine.
+    const documents: SearchDocument[] = [];
     for (const [topic, detail] of Object.entries(this.data.specDetails)) {
-      if (detail.content.toLowerCase().includes(q) || topic.toLowerCase().includes(q)) {
-        const idx = detail.content.toLowerCase().indexOf(q);
-        const start = Math.max(0, idx - 60);
-        const end = Math.min(detail.content.length, idx + query.length + 60);
-        const context = (start > 0 ? "..." : "") + detail.content.slice(start, end) + (end < detail.content.length ? "..." : "");
-        results.push({ type: "spec", title: topic, topic, context });
-      }
+      documents.push(specSearchDocument(topic, detail.content));
     }
-
-    // 搜尋 changes：合併所有 markdown artifact 內容（不再限定 proposal/design）
-    for (const [slug, detail] of Object.entries(this.data.changeDetails)) {
-      const texts = detail.artifacts
-        .map((a) => a.content)
-        .filter((c): c is string => Boolean(c));
-      const combined = texts.join("\n");
-      if (combined.toLowerCase().includes(q) || slug.toLowerCase().includes(q)) {
-        const idx = combined.toLowerCase().indexOf(q);
-        const start = Math.max(0, idx - 60);
-        const end = Math.min(combined.length, idx + query.length + 60);
-        const context = idx >= 0
-          ? (start > 0 ? "..." : "") + combined.slice(start, end) + (end < combined.length ? "..." : "")
-          : slug;
-        results.push({ type: "change", title: slug, slug, context });
-      }
+    for (const detail of Object.values(this.data.changeDetails)) {
+      documents.push(...changeSearchDocuments(detail));
     }
-
-    return Promise.resolve(results);
+    return Promise.resolve(searchDocuments(documents, query));
   }
 
   browse(): Promise<BrowseData> {

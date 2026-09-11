@@ -32,18 +32,16 @@ function openspecDir(repoDir: string): string {
   return path.join(repoDir, "openspec");
 }
 
+// parseSlug lives in search.ts: a result title is part of the search rule, and the static build has no
+// filesystem to reach this module through. Re-exported here so importers of scanner.js are unaffected.
+import { parseSlug } from "./search.js";
+export { parseSlug };
+
 function readFileOrNull(filePath: string): string | null {
   if (!fs.existsSync(filePath)) return null;
   return fs.readFileSync(filePath, "utf-8");
 }
 
-export function parseSlug(slug: string): { date: string | null; description: string } {
-  const match = slug.match(/^(\d{4}-\d{2}-\d{2})-(.+)$/);
-  if (match) {
-    return { date: match[1], description: match[2].replace(/-/g, " ") };
-  }
-  return { date: null, description: slug.replace(/-/g, " ") };
-}
 
 function safeReadDir(dirPath: string): string[] {
   if (!fs.existsSync(dirPath)) return [];

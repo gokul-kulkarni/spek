@@ -1,0 +1,31 @@
+{
+  "name": "slug-only-match-is-previewed-from-markdown-not-data",
+  "note": "Documents arrive markdown-and-tasks first, then data, so a name-only match previews prose.",
+  "input": [
+    {
+      "type": "change",
+      "name": "add-events",
+      "file": "design.md",
+      "text": "event driven design prose",
+      "status": "active"
+    },
+    {
+      "type": "change",
+      "name": "add-events",
+      "file": "asyncapi.yaml",
+      "text": "asyncapi: 3.0.0",
+      "status": "active"
+    }
+  ],
+  "query": "add-events",
+  "expected": [
+    {
+      "type": "change",
+      "slug": "add-events",
+      "title": "add events",
+      "file": "design.md",
+      "status": "active",
+      "context": "event driven design prose"
+    }
+  ]
+}

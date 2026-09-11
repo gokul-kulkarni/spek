@@ -1,0 +1,24 @@
+{
+  "name": "query-copied-from-a-result-card-finds-it",
+  "note": "A card shows the humanised description, so matching only the hyphenated slug turns the most natural follow-up query into no results.",
+  "input": [
+    {
+      "type": "change",
+      "name": "unified-search-semantics",
+      "file": "proposal.md",
+      "text": "nothing relevant here",
+      "status": "active"
+    }
+  ],
+  "query": "unified search semantics",
+  "expected": [
+    {
+      "type": "change",
+      "slug": "unified-search-semantics",
+      "title": "unified search semantics",
+      "file": "proposal.md",
+      "status": "active",
+      "context": "nothing relevant here"
+    }
+  ]
+}

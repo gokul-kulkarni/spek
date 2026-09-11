@@ -1,0 +1,14 @@
+{
+  "name": "a-blank-query-returns-nothing",
+  "note": "Present but empty is a caller who searched for nothing.",
+  "input": [
+    {
+      "type": "spec",
+      "name": "a",
+      "file": "spec.md",
+      "text": "anything at all"
+    }
+  ],
+  "query": "   ",
+  "expected": []
+}

@@ -1,0 +1,22 @@
+{
+  "name": "snippet-offsets-are-located-in-the-original-text",
+  "note": "U+0130 expands to two code units under a whole-string fold in JavaScript and collapses to one in Java. Folding per code unit keeps offsets in the original and keeps the two agreeing.",
+  "input": [
+    {
+      "type": "spec",
+      "name": "foo",
+      "file": "spec.md",
+      "text": "\u0130aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaTOKENbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
+  ],
+  "query": "TOKEN",
+  "expected": [
+    {
+      "type": "spec",
+      "topic": "foo",
+      "title": "foo",
+      "file": "spec.md",
+      "context": "...aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaTOKENbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb..."
+    }
+  ]
+}

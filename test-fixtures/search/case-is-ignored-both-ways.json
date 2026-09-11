@@ -1,0 +1,22 @@
+{
+  "name": "case-is-ignored-both-ways",
+  "note": "Folding applies to both sides of the comparison.",
+  "input": [
+    {
+      "type": "spec",
+      "name": "a",
+      "file": "spec.md",
+      "text": "a SwitchUserToken here"
+    }
+  ],
+  "query": "SWITCHUSERTOKEN",
+  "expected": [
+    {
+      "type": "spec",
+      "topic": "a",
+      "title": "a",
+      "file": "spec.md",
+      "context": "a SwitchUserToken here"
+    }
+  ]
+}

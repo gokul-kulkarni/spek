@@ -74,6 +74,7 @@ class SpekHttpRequestHandler : HttpRequestHandler() {
             when (result) {
                 is ApiResult.Json -> sendJson(context, result.body)
                 is ApiResult.NotFound -> sendJson(context, result.body, HttpResponseStatus.NOT_FOUND)
+                is ApiResult.BadRequest -> sendJson(context, result.body, HttpResponseStatus.BAD_REQUEST)
                 null -> sendError(context, HttpResponseStatus.NOT_FOUND, "Endpoint not found: $apiPath")
             }
         } catch (e: Exception) {
@@ -96,6 +97,7 @@ class SpekHttpRequestHandler : HttpRequestHandler() {
     internal sealed interface ApiResult {
         data class Json(val body: String) : ApiResult
         data class NotFound(val body: String) : ApiResult
+        data class BadRequest(val body: String) : ApiResult
     }
 
     // internal 而非 private：路由表本身要能單測。缺 projectPath 的 400 由 process() 的共用檢查負責，
@@ -163,8 +165,12 @@ class SpekHttpRequestHandler : HttpRequestHandler() {
 
         // openspec/search
         if (apiPath == "openspec/search") {
-            val query = params["q"]?.firstOrNull() ?: ""
-            return ApiResult.Json(handleSearch(projectPath, query))
+            // Absent is a caller who forgot to ask; present-but-empty is a caller who searched for
+            // nothing. Defaulting a missing q to "" made this endpoint answer 200 [] where the web
+            // endpoint answers 400 — the same request, two answers, which is what this rule closes.
+            val values = params["q"] ?: return badRequest("q parameter is required")
+            if (values.size > 1) return badRequest("q must be given once")
+            return ApiResult.Json(handleSearch(projectPath, values[0]))
         }
 
         // openspec/resync
@@ -296,6 +302,9 @@ class SpekHttpRequestHandler : HttpRequestHandler() {
     }
 
     /** A 404 body carrying why, so "we could not look" never reads as "it does not exist". */
+    private fun badRequest(message: String): ApiResult.BadRequest =
+        ApiResult.BadRequest(json.encodeToString(ApiErrorBody(message, "bad-request")))
+
     private fun notFound(message: String, reason: SchemaDegradedReason? = null): ApiResult.NotFound =
         ApiResult.NotFound(json.encodeToString(ApiErrorBody(message, reason?.wire ?: "not-found")))
 

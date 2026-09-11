@@ -1,0 +1,31 @@
+{
+  "name": "data-artifact-content-is-searchable",
+  "note": "A data artifact is shown as a tab, so it is indexed.",
+  "input": [
+    {
+      "type": "change",
+      "name": "add-events",
+      "file": "design.md",
+      "text": "design prose",
+      "status": "active"
+    },
+    {
+      "type": "change",
+      "name": "add-events",
+      "file": "asyncapi.yaml",
+      "text": "asyncapi: 3.0.0\ndeadLetterId: dlq-1\n",
+      "status": "active"
+    }
+  ],
+  "query": "deadLetterId",
+  "expected": [
+    {
+      "type": "change",
+      "slug": "add-events",
+      "title": "add events",
+      "file": "asyncapi.yaml",
+      "status": "active",
+      "context": "asyncapi: 3.0.0\ndeadLetterId: dlq-1\n"
+    }
+  ]
+}

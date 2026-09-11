@@ -93,9 +93,19 @@ export interface ChangeArtifact {
   /** 顯示標題（由檔名 humanize） */
   title: string;
   kind: ArtifactKind;
+  /**
+   * The root filename this artifact was discovered from; absent on the `specs` tree, which has no single
+   * file. It is the one key both search-document producers can order by: `title` is humanized for
+   * markdown and the bare filename for data, so sorting by it would only coincidentally agree.
+   */
+  file?: string;
   /** kind === "markdown" | "data"：原始檔案內容（markdown 為 Markdown 文字，data 為 .yaml/.yml/.json 原文） */
   content?: string;
-  /** kind === "tasks"：解析後的 tasks */
+  /**
+   * kind === "tasks"：解析後的 tasks。The raw file text is carried on `content` as well, because the
+   * parser keeps section titles and task text and drops the rest — a consumer holding only this holds
+   * less than the file says.
+   */
   tasks?: ParsedTasks;
   /** kind === "specs"：delta spec 清單 */
   specs?: { topic: string; content: string }[];
@@ -156,7 +166,10 @@ export interface SearchResult {
   slug?: string;
   topic?: string;
   context: string;
+  /** The root file the matching document came from. */
   file?: string;
+  /** Changes only: lets the dialog mark a result that comes from archived content. */
+  status?: "active" | "archived";
 }
 
 export interface BrowseEntry {

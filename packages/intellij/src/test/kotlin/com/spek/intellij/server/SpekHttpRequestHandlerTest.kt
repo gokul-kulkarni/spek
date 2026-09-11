@@ -119,4 +119,35 @@ class SpekHttpRequestHandlerTest {
             it.deleteOnExit()
             it
         }
+
+    /**
+     * The two HTTP surfaces must answer a malformed search request the same way. This route used to
+     * default a missing `q` to "" and answer 200 with an empty array, where the web endpoint answered
+     * 400 — the same request, two answers, which is exactly what the shared search rule closes.
+     */
+    @Test
+    fun searchRejectsAnAbsentOrRepeatedQueryParameter() {
+        val handler = SpekHttpRequestHandler()
+        val project = createTempProject().absolutePath
+
+        val absent = handler.routeRequest("openspec/search", project, emptyMap())
+        assertTrue(
+            assertIs<SpekHttpRequestHandler.ApiResult.BadRequest>(absent).body.contains("q parameter is required"),
+        )
+
+        val repeated = handler.routeRequest("openspec/search", project, mapOf("q" to listOf("a", "b")))
+        assertTrue(
+            assertIs<SpekHttpRequestHandler.ApiResult.BadRequest>(repeated).body.contains("q must be given once"),
+        )
+    }
+
+    /** Present but empty is a caller who searched for nothing, which is a 200 with no results. */
+    @Test
+    fun searchWithAnEmptyQueryIsAnEmptyResultSet() {
+        val handler = SpekHttpRequestHandler()
+        val project = createTempProject().absolutePath
+
+        val blank = handler.routeRequest("openspec/search", project, mapOf("q" to listOf("  ")))
+        assertEquals("[]", assertIs<SpekHttpRequestHandler.ApiResult.Json>(blank).body)
+    }
 }

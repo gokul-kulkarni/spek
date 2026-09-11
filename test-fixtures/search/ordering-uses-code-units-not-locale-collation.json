@@ -1,0 +1,31 @@
+{
+  "name": "ordering-uses-code-units-not-locale-collation",
+  "note": "ICU collation weakens the hyphen and would order specdiff before spec-diff.",
+  "input": [
+    {
+      "type": "spec",
+      "name": "specdiff",
+      "file": "spec.md",
+      "text": "TOKEN"
+    },
+    {
+      "type": "spec",
+      "name": "spec-diff",
+      "file": "spec.md",
+      "text": "TOKEN"
+    }
+  ],
+  "query": "TOKEN",
+  "expected": [
+    {
+      "type": "spec",
+      "topic": "spec-diff",
+      "title": "spec-diff"
+    },
+    {
+      "type": "spec",
+      "topic": "specdiff",
+      "title": "specdiff"
+    }
+  ]
+}

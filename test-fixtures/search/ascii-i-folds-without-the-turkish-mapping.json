@@ -1,0 +1,22 @@
+{
+  "name": "ascii-i-folds-without-the-turkish-mapping",
+  "note": "A locale-sensitive fold maps I to U+0131 under tr-TR, and the query would stop matching. Both implementations must use the locale-independent fold.",
+  "input": [
+    {
+      "type": "spec",
+      "name": "a",
+      "file": "spec.md",
+      "text": "INDEX of things"
+    }
+  ],
+  "query": "index",
+  "expected": [
+    {
+      "type": "spec",
+      "topic": "a",
+      "title": "a",
+      "file": "spec.md",
+      "context": "INDEX of things"
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "name": "a-change-matching-three-files-is-listed-once",
+  "note": "The web server and the VS Code host emitted one document per file, so a term in three files listed the change three times.",
+  "input": [
+    {
+      "type": "change",
+      "name": "c",
+      "file": "design.md",
+      "text": "TOKEN in design",
+      "status": "active"
+    },
+    {
+      "type": "change",
+      "name": "c",
+      "file": "proposal.md",
+      "text": "TOKEN in proposal",
+      "status": "active"
+    },
+    {
+      "type": "change",
+      "name": "c",
+      "file": "tasks.md",
+      "text": "TOKEN in tasks",
+      "status": "active"
+    }
+  ],
+  "query": "TOKEN",
+  "expected": [
+    {
+      "type": "change",
+      "slug": "c",
+      "title": "c",
+      "file": "design.md",
+      "status": "active",
+      "context": "TOKEN in design"
+    }
+  ]
+}

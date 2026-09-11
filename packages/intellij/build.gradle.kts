@@ -128,5 +128,12 @@ tasks {
         // It is not a guard against a wrong path: a directory that exists and is empty passes
         // validation here, so the loader's own zero-fixtures check is what fails that.
         inputs.dir(repoCorpus).withPropertyName("taskParserCorpus")
+
+        // The shared search fixture corpus, read by SearchCorpusTest alongside the Node suite in
+        // packages/core. Same resolution and same input registration as the corpus above. It is not
+        // overridable: there is no generator for it, so there is no scratch directory to substitute.
+        val searchCorpus = layout.projectDirectory.dir("../../test-fixtures/search").asFile
+        systemProperty("spek.searchCorpus", searchCorpus.absolutePath)
+        inputs.dir(searchCorpus).withPropertyName("searchCorpus")
     }
 }

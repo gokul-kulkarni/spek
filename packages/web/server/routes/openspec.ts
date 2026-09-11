@@ -1,10 +1,10 @@
 import { Router, Request, Response, NextFunction } from "express";
-import Fuse from "fuse.js";
 import fs from "node:fs";
 import path from "node:path";
 import chokidar, { type FSWatcher } from "chokidar";
 import {
   scanOpenSpec,
+  searchRepository,
   scanOpenSpecAggregated,
   readSpec,
   readChange,
@@ -13,7 +13,6 @@ import {
   buildGraphDataAggregated,
   listWorkspaces,
   toWorktreeSource,
-  listChangeArtifactFiles,
   DATA_EXTENSIONS,
   listSchemas,
   readSchema,
@@ -254,101 +253,22 @@ openspecRouter.get("/schemas/:name", async (req, res) => {
   res.status(404).json({ error: "Schema not found", reason: result.reason });
 });
 
-interface SearchDocument {
-  type: "spec" | "change";
-  name: string;
-  content: string;
-}
-
 openspecRouter.get("/search", (req, res) => {
   const dir = req.query.dir as string;
-  const q = req.query.q as string;
+  const q = req.query.q;
 
-  if (!q) {
+  // Absent is a caller who forgot to ask; present-but-empty is a caller who searched for nothing. A
+  // falsiness test cannot tell `?q=` from no `q` at all, so the parameter's presence is what is tested.
+  if (q === undefined) {
     res.status(400).json({ error: "q parameter is required" });
     return;
   }
-
-  const documents: SearchDocument[] = [];
-  const openspecBase = path.join(dir, "openspec");
-
-  // 收集 specs 內容
-  const specsDir = path.join(openspecBase, "specs");
-  if (fs.existsSync(specsDir)) {
-    for (const topic of fs.readdirSync(specsDir)) {
-      const specPath = path.join(specsDir, topic, "spec.md");
-      if (fs.existsSync(specPath)) {
-        documents.push({
-          type: "spec",
-          name: topic,
-          content: fs.readFileSync(specPath, "utf-8"),
-        });
-      }
-    }
+  if (typeof q !== "string") {
+    res.status(400).json({ error: "q must be given once" });
+    return;
   }
 
-  // 收集 changes 內容（active + archived）：索引每個 change 內所有 root *.md artifact，
-  // 不再限定 proposal/design/tasks，使自訂 schema 的 brainstorm/plan/verify 等也可被搜尋
-  const changesDir = path.join(openspecBase, "changes");
-  const collectChanges = (baseDir: string) => {
-    if (!fs.existsSync(baseDir)) return;
-    for (const slug of fs.readdirSync(baseDir)) {
-      if (slug === "archive") continue;
-      const changePath = path.join(baseDir, slug);
-      if (!fs.statSync(changePath).isDirectory()) continue;
-
-      // Index every root artifact file of the change (markdown, tasks, and data), from the same
-      // @spekjs/core list the tabs and the count use. So any tab that comes from a root file is
-      // searchable. The specs delta tree is not indexed here, as before.
-      for (const file of listChangeArtifactFiles(changePath)) {
-        documents.push({
-          type: "change",
-          name: slug,
-          content: fs.readFileSync(path.join(changePath, file), "utf-8"),
-        });
-      }
-    }
-  };
-
-  collectChanges(changesDir);
-  collectChanges(path.join(changesDir, "archive"));
-
-  const fuse = new Fuse(documents, {
-    keys: ["content"],
-    includeScore: true,
-    includeMatches: true,
-    threshold: 0.4,
-  });
-
-  const results = fuse.search(q);
-
-  const response = results.map((r) => {
-    const matches =
-      r.matches?.map((m) => {
-        const value = m.value || "";
-        const indices = m.indices || [];
-        return indices.slice(0, 3).map(([start, end]) => {
-          const contextStart = Math.max(0, start - 100);
-          const contextEnd = Math.min(value.length, end + 101);
-          return value.slice(contextStart, contextEnd);
-        });
-      }).flat() || [];
-
-    const name = r.item.name;
-    const title = r.item.type === "change"
-      ? name.replace(/^\d{4}-\d{2}-\d{2}-/, "").replace(/-/g, " ")
-      : name;
-
-    return {
-      type: r.item.type,
-      title,
-      topic: r.item.type === "spec" ? name : undefined,
-      slug: r.item.type === "change" ? name : undefined,
-      context: matches[0] || "",
-    };
-  });
-
-  res.json(response);
+  res.json(searchRepository(dir, q));
 });
 
 openspecRouter.get("/graph", async (req, res) => {

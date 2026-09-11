@@ -445,3 +445,38 @@ test("changeDirMtime: an edit to only a data file bumps the change mtime", () =>
   const dataMtime = fs.statSync(path.join(changePath, "asyncapi.yaml")).mtimeMs;
   assert.equal(changeDirMtime(changePath), dataMtime); // the data file's mtime, not ignored
 });
+
+test("every root artifact carries its source filename, and the specs tree carries none", () => {
+  const repo = mkRepo();
+  const changePath = writeChange(repo, "c", {
+    "proposal.md": "p",
+    "tasks.md": "- [ ] 1.1 do it",
+    "asyncapi.yaml": "openapi: 3.0.0",
+    "specs/topic/spec.md": "delta",
+  });
+  const artifacts = discoverArtifacts(changePath);
+
+  const files = new Map(artifacts.map((a) => [a.id, a.file]));
+  assert.equal(files.get("proposal"), "proposal.md");
+  assert.equal(files.get("tasks"), "tasks.md");
+  assert.equal(files.get("asyncapi"), "asyncapi.yaml");
+  // The specs artifact is a tree, not a file, so it has no filename to carry.
+  assert.equal(files.get("specs"), undefined);
+  fs.rmSync(repo, { recursive: true, force: true });
+});
+
+test("the tasks artifact carries the file's raw text alongside its parsed structure", () => {
+  const repo = mkRepo();
+  // A column-0 blockquote is exactly what the parser drops, so it is the line that proves the raw text
+  // is carried rather than reconstructed from the parse.
+  const source = "## Group\n\n- [x] 1.1 done\n\n> a callout the parser does not keep\n";
+  const changePath = writeChange(repo, "c", { "tasks.md": source });
+  const [tasks] = discoverArtifacts(changePath);
+
+  assert.equal(tasks.kind, "tasks");
+  assert.equal(tasks.content, source);
+  assert.equal(tasks.tasks?.total, 1);
+  assert.equal(tasks.tasks?.completed, 1);
+  assert.ok(!JSON.stringify(tasks.tasks).includes("callout"));
+  fs.rmSync(repo, { recursive: true, force: true });
+});

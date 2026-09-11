@@ -147,7 +147,7 @@ GET /api/openspec/search?dir=...&q=...             # full-text search
 | Frontend | React 19 + Vite + TypeScript + Tailwind CSS v4 |
 | Backend | Express.js (reads local files, serves REST) |
 | Markdown | react-markdown + remark-gfm (BDD highlighting) |
-| Search | Server-side full-text + Fuse.js |
+| Search | One rule in `@spekjs/core` (case-insensitive exact substring), mirrored in Kotlin |
 | Routing | React Router v7 (Web: BrowserRouter; webview: MemoryRouter) |
 | VS Code | Webview API + esbuild |
 | IntelliJ | Kotlin + JCEF + IntelliJ Platform SDK |

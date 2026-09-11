@@ -221,7 +221,7 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
                 const idx = globalIndex++;
                 return (
                   <ResultItem
-                    key={`spec-${result.title}`}
+                    key={resultKey(result)}
                     result={result}
                     query={query}
                     selected={idx === selectedIndex}
@@ -241,7 +241,7 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
                 const idx = globalIndex++;
                 return (
                   <ResultItem
-                    key={`change-${result.title}`}
+                    key={resultKey(result)}
                     result={result}
                     query={query}
                     selected={idx === selectedIndex}
@@ -257,7 +257,15 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
   );
 }
 
-function ResultItem({
+/**
+ * A result's identity. Keyed by title, two changes archived on different dates that share a description
+ * collide and React drops one of them; the slug or topic is the thing that is actually unique.
+ */
+export function resultKey(result: SearchResult): string {
+  return `${result.type}-${result.topic ?? result.slug ?? result.title}`;
+}
+
+export function ResultItem({
   result,
   query,
   selected,
@@ -275,9 +283,21 @@ function ResultItem({
         selected ? "bg-bg-tertiary" : "hover:bg-bg-tertiary/50"
       }`}
     >
-      <div className="text-sm font-medium text-text-primary">
-        <HighlightText text={result.title} query={query} />
+      <div className="flex items-center gap-2 text-sm font-medium text-text-primary">
+        <span className="truncate">
+          <HighlightText text={result.title} query={query} />
+        </span>
+        {result.status === "archived" && (
+          <span className="shrink-0 text-[10px] uppercase tracking-wider text-text-muted border border-border rounded px-1 py-px">
+            Archived
+          </span>
+        )}
       </div>
+      {/* A result can be returned on a name match with nothing to highlight in its snippet, so the file
+          it came from is what explains the row. Without it such a result looks arbitrary. */}
+      {result.file && (
+        <div className="text-[11px] text-text-muted mt-0.5">{result.file}</div>
+      )}
       {result.context && (
         <div className="text-xs text-text-muted mt-0.5 truncate">
           <HighlightText text={result.context} query={query} />

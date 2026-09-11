@@ -2,9 +2,9 @@ import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
 import * as vscode from "vscode";
-import Fuse from "fuse.js";
 import {
   scanOpenSpec,
+  searchRepository,
   scanOpenSpecAggregated,
   readSpec,
   readChange,
@@ -13,7 +13,6 @@ import {
   buildGraphDataAggregated,
   listWorkspaces,
   toWorktreeSource,
-  listChangeArtifactFiles,
   listSchemas,
   readSchema,
   groupSchemaUsage,
@@ -174,82 +173,10 @@ export class MessageHandler {
   }
 
   private search(query: string) {
-    if (!query) throw new Error("query is required");
-
-    interface SearchDocument {
-      type: "spec" | "change";
-      name: string;
-      content: string;
-    }
-
-    const documents: SearchDocument[] = [];
-    const openspecBase = path.join(this.workspacePath, "openspec");
-
-    // 收集 specs
-    const specsDir = path.join(openspecBase, "specs");
-    if (fs.existsSync(specsDir)) {
-      for (const topic of fs.readdirSync(specsDir)) {
-        const specPath = path.join(specsDir, topic, "spec.md");
-        if (fs.existsSync(specPath)) {
-          documents.push({ type: "spec", name: topic, content: fs.readFileSync(specPath, "utf-8") });
-        }
-      }
-    }
-
-    // 收集 changes
-    const changesDir = path.join(openspecBase, "changes");
-    const collectChanges = (baseDir: string) => {
-      if (!fs.existsSync(baseDir)) return;
-      for (const slug of fs.readdirSync(baseDir)) {
-        if (slug === "archive") continue;
-        const changePath = path.join(baseDir, slug);
-        if (!fs.statSync(changePath).isDirectory()) continue;
-        // Index every root artifact file of the change (markdown, tasks, and data, including
-        // custom-schema files like brainstorm/plan/verify), from the same @spekjs/core list the tabs
-        // and the count use. So any tab that comes from a root file is searchable. The specs delta tree
-        // is not indexed here, as before.
-        for (const file of listChangeArtifactFiles(changePath)) {
-          documents.push({
-            type: "change",
-            name: slug,
-            content: fs.readFileSync(path.join(changePath, file), "utf-8"),
-          });
-        }
-      }
-    };
-    collectChanges(changesDir);
-    collectChanges(path.join(changesDir, "archive"));
-
-    const fuse = new Fuse(documents, {
-      keys: ["content"],
-      includeScore: true,
-      includeMatches: true,
-      threshold: 0.4,
-    });
-
-    const results = fuse.search(query);
-    return results.map((r) => {
-      const matches = r.matches?.flatMap((m) => {
-        const value = m.value || "";
-        const indices = m.indices || [];
-        return indices.slice(0, 3).map(([start, end]) => {
-          const contextStart = Math.max(0, start - 100);
-          const contextEnd = Math.min(value.length, end + 101);
-          return value.slice(contextStart, contextEnd);
-        });
-      }) || [];
-      const name = r.item.name;
-      const title = r.item.type === "change"
-        ? name.replace(/^\d{4}-\d{2}-\d{2}-/, "").replace(/-/g, " ")
-        : name;
-      return {
-        type: r.item.type,
-        title,
-        topic: r.item.type === "spec" ? name : undefined,
-        slug: r.item.type === "change" ? name : undefined,
-        context: matches[0] || "",
-      };
-    });
+    // The rule, the corpus and the ordering all live in @spekjs/core. This host held a verbatim copy of
+    // the web server's Fuse index, which is how issue #51 shipped here too without anyone reporting it.
+    if (query === undefined || query === null) throw new Error("query is required");
+    return searchRepository(this.workspacePath, query);
   }
 
   private browse(dirPath?: string) {

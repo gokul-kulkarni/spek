@@ -2,98 +2,68 @@ package com.spek.intellij.core
 
 import java.io.File
 
+/**
+ * The filesystem side of the search corpus: one document per spec, one per change root artifact file.
+ *
+ * Mirrors `packages/core/src/search-documents.ts`. The rule itself is in [SearchRule]; this only decides
+ * which documents exist. The change's delta `specs/` tree is not indexed: its content is the delta of a
+ * main spec that is itself indexed, so indexing it would list the same text under two names.
+ */
 object SearchService {
 
-    fun search(projectPath: String, query: String): List<SearchResult> {
-        if (query.isBlank()) return emptyList()
+    fun search(projectPath: String, query: String): List<SearchResult> =
+        SearchRule.search(collectDocuments(projectPath), query)
 
-        val results = mutableListOf<SearchResult>()
-        val lowerQuery = query.lowercase()
+    /** Directory entries, minus dot entries. A missing directory reads as empty. */
+    private fun entries(dir: File): List<File> =
+        dir.listFiles()?.filter { !it.name.startsWith(".") }?.sortedBy { it.name } ?: emptyList()
+
+    fun collectDocuments(projectPath: String): List<SearchRule.Document> {
         val base = File(projectPath, "openspec")
+        val documents = mutableListOf<SearchRule.Document>()
 
-        // 搜尋 specs
         val specsDir = File(base, "specs")
-        if (specsDir.isDirectory) {
-            specsDir.listFiles()
-                ?.filter { it.isDirectory && !it.name.startsWith(".") }
-                ?.forEach { topicDir ->
-                    val specFile = File(topicDir, "spec.md")
-                    if (specFile.exists()) {
-                        val content = specFile.readText()
-                        if (topicDir.name.lowercase().contains(lowerQuery) ||
-                            content.lowercase().contains(lowerQuery)
-                        ) {
-                            results.add(
-                                SearchResult(
-                                    type = "spec",
-                                    title = topicDir.name,
-                                    topic = topicDir.name,
-                                    context = extractContext(content, lowerQuery),
-                                    file = "spec.md",
-                                )
-                            )
-                        }
-                    }
-                }
+        for (topicDir in entries(specsDir)) {
+            if (!topicDir.isDirectory) continue
+            val specFile = File(topicDir, "spec.md")
+            if (!specFile.exists()) continue
+            documents.add(
+                SearchRule.Document(
+                    type = "spec",
+                    name = topicDir.name,
+                    file = "spec.md",
+                    text = specFile.readText(),
+                )
+            )
         }
 
-        // 搜尋 changes（active + archived）
-        searchChangesDir(File(base, "changes"), lowerQuery, results)
-        searchChangesDir(File(base, "changes/archive"), lowerQuery, results)
+        val changesDir = File(base, "changes")
+        collectChanges(changesDir, "active", documents)
+        collectChanges(File(changesDir, "archive"), "archived", documents)
 
-        return results
+        return documents
     }
 
-    private fun searchChangesDir(
+    private fun collectChanges(
         dir: File,
-        lowerQuery: String,
-        results: MutableList<SearchResult>,
+        status: String,
+        out: MutableList<SearchRule.Document>,
     ) {
-        if (!dir.isDirectory) return
-        dir.listFiles()
-            ?.filter { it.isDirectory && it.name != "archive" && !it.name.startsWith(".") }
-            ?.forEach { changeDir ->
-                val slug = changeDir.name
-                // Index every root artifact file of the change (markdown, tasks, and data, including
-                // custom-schema files like brainstorm/plan/verify), so any tab that comes from a root file
-                // is searchable. The specs delta tree is not indexed here, as before.
-                //
-                // Iterate in rootArtifacts order (markdown before data), NOT the name-sorted artifactFiles
-                // list. This loop breaks on the first file whose slug OR content matches. A slug always
-                // matches, whatever the file, so the reported snippet comes from the first file iterated.
-                // Name-sorting put `asyncapi.yaml` ahead of `design.md`, so a slug search previewed raw
-                // YAML instead of the design prose it used to show. Markdown-first restores that, and still
-                // reaches data files for a content-only match.
-                val files = ArtifactFiles.rootArtifacts(changeDir).map { it.first }
-                for (file in files) {
-                    val content = file.readText()
-                    if (slug.lowercase().contains(lowerQuery) ||
-                        content.lowercase().contains(lowerQuery)
-                    ) {
-                        val (_, description) = parseSlug(slug)
-                        results.add(
-                            SearchResult(
-                                type = "change",
-                                title = description,
-                                slug = slug,
-                                context = extractContext(content, lowerQuery),
-                                file = file.name,
-                            )
-                        )
-                        break // 每個 change 只回傳一次
-                    }
-                }
+        for (changeDir in entries(dir)) {
+            if (!changeDir.isDirectory || changeDir.name == "archive") continue
+            // rootArtifacts order — markdown and tasks before data — so a change matched by name alone is
+            // previewed from prose rather than from raw YAML.
+            for ((file, _) in ArtifactFiles.rootArtifacts(changeDir)) {
+                out.add(
+                    SearchRule.Document(
+                        type = "change",
+                        name = changeDir.name,
+                        file = file.name,
+                        text = file.readText(),
+                        status = status,
+                    )
+                )
             }
-    }
-
-    private fun extractContext(content: String, lowerQuery: String): String {
-        val lowerContent = content.lowercase()
-        val idx = lowerContent.indexOf(lowerQuery)
-        if (idx < 0) return content.take(200)
-
-        val start = maxOf(0, idx - 100)
-        val end = minOf(content.length, idx + lowerQuery.length + 100)
-        val snippet = content.substring(start, end)
-        return (if (start > 0) "..." else "") + snippet + (if (end < content.length) "..." else "")
+        }
     }
 }

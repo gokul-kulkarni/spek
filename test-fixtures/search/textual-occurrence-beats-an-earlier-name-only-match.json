@@ -1,0 +1,31 @@
+{
+  "name": "textual-occurrence-beats-an-earlier-name-only-match",
+  "note": "A slug match makes every document of the change match. The result must still come from the file that contains the query, or the snippet holds nothing the reader typed.",
+  "input": [
+    {
+      "type": "change",
+      "name": "add-oauth",
+      "file": "design.md",
+      "text": "no occurrence here",
+      "status": "active"
+    },
+    {
+      "type": "change",
+      "name": "add-oauth",
+      "file": "tasks.md",
+      "text": "- [ ] 1.1 wire up oauth callback",
+      "status": "active"
+    }
+  ],
+  "query": "oauth",
+  "expected": [
+    {
+      "type": "change",
+      "slug": "add-oauth",
+      "title": "add oauth",
+      "file": "tasks.md",
+      "status": "active",
+      "context": "- [ ] 1.1 wire up oauth callback"
+    }
+  ]
+}

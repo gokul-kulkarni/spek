@@ -62,7 +62,7 @@ change to those still needs manual verification — a temporary `workflow_dispat
   entry under Key Design Decisions. The web `/graph` and `/timeline` pages are thin shells (fetch / loading /
   navigation / theme).
 - React 19 + Vite + TS + Tailwind v4; Express (REST); VS Code Webview + esbuild; IntelliJ Kotlin + JCEF + built-in
-  server; react-markdown + remark-gfm (BDD highlighting); search = server-side full-text + Fuse.js; React Router v7
+  server; react-markdown + remark-gfm (BDD highlighting); search = one rule in `@spekjs/core` (case-insensitive exact substring, Kotlin mirror); React Router v7
   (Web BrowserRouter / webview MemoryRouter).
 
 ## Project Structure
@@ -70,6 +70,7 @@ change to those still needs manual verification — a temporary `workflow_dispat
 ```
 packages/
 ├── core/       # @spekjs/core — pure logic (scanner.ts, tasks.ts, artifact-files.ts, artifact-discovery.ts, schema-order.ts, schemas.ts,
+│            #   search.ts=the search rule, search-documents.ts=its Node corpus,
 │            #   schema-flow.ts, openspec-cli.ts, git-cache.ts, types.ts)
 ├── ui/         # @spekjs/ui — visual components (SpecGraph.tsx, timeline/*, theme.ts=color contract, styles.css)
 ├── web/        # @spekjs/web — server/ (Express API) + src/ (React SPA + API adapters)
@@ -316,6 +317,36 @@ the generic version does not compile. The guard for this is a **type-level** tes
 (assignment back to the caller's own array type, plus a `@ts-expect-error` on an element missing `title`), because no
 behavior test can see a narrowed return type; it is checked by `tsconfig.test.json`, i.e. by `npm run type-check`,
 not by `npm test`.
+
+**Search**: the rule is `searchDocuments(docs, query)` on the browser-safe **`@spekjs/core/search`** subpath —
+corpus membership, the match test, result selection, ordering, snippet and `parseSlug` (which lives there, not in
+`scanner.ts`, because a result's title is part of the rule and the static build has no filesystem). Every surface
+calls it: web server and VS Code host via `searchRepository(basePath, q)`, `StaticAdapter` via
+`changeSearchDocuments` over the embedded payload, IntelliJ via the Kotlin mirror `SearchRule.kt`. **No host holds a
+match test, an ordering or a snippet rule of its own** — four copies is what shipped issue #51 to two surfaces and
+made four answers to one query. Five things that are not the obvious shape:
+- **Case folding is per UTF-16 code unit, not per string.** Whole-string folding is exactly where the runtimes
+  disagree (`ß` → `ss` in JS but not Java; `İ` expands in JS, collapses in Java) and it is not length-preserving, so
+  an offset from the folded copy misaligns every snippet after it. Per-unit folding is `Character.toLowerCase` on
+  both sides. The guarantee is stated as exact for ASCII, best-effort beyond — an astral character folds on neither
+  side. `toLocaleLowerCase` / `lowercase(Locale)` / Java's `String.toLowerCase()` are forbidden (Turkish `I` → `ı`).
+- **A result comes from the first document whose *text* contains the query**, not the first that matches. A slug
+  match makes *every* document of that change match, so "first match" discards the real occurrence and hands the
+  reader a snippet with nothing they typed in it. Name-only matches fall back to the first document.
+- **Names match in their displayed form too** (`[-_]+` → space). The card shows `unified search semantics`; matching
+  only the hyphenated slug means a query copied off a result finds nothing. Fuse's fuzziness used to hide this.
+- **Two corpus producers, because the inputs differ** — `collectSearchDocuments` (files, package index) and
+  `changeSearchDocuments` (records, browser-safe). They must agree document for document, and
+  `search-documents.test.ts` pins that over this repo rather than leaving it to review. The `specs` delta tree is in
+  neither: it is the delta of a main spec that is already indexed.
+- **Ordering is UTF-16 code-unit, never `localeCompare`** (ICU weakens `-`, so `spec-diff`/`specdiff` would differ
+  from Kotlin's `sortedBy`), and **archived changes sort by slug descending** — their `YYYY-MM-DD-` prefix means
+  ascending would lead with the oldest, the one list in spek pointing the wrong way.
+`test-fixtures/search/` is the shared corpus, read in full by both languages. Narrower than the task-parser one on
+purpose: **no generator and no `invalid/`**, so a loader asserts only *that* a malformed fixture is rejected, never
+the wording — two hand-copied message strings with nothing enforcing their equality is the drift a corpus exists to
+prevent. The byte guard is shared, in `fixture-bytes.test.ts` (named `*.test.ts` to stay out of `dist`, registering
+no tests).
 
 **Polling fallback**: inotify doesn't deliver events on 9p/drvfs/NFS/CIFS mounts (devcontainer/WSL), so the decision is
 by the watched path's fstype (`decidePolling` precedence: explicit override `SPEK_WATCH_POLLING` /

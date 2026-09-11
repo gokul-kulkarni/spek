@@ -115,8 +115,12 @@ export function specsMtime(changePath: string): number {
 
 /**
  * The root files that count as a searchable artifact (markdown, tasks, and data), sorted by name. The
- * web and vscode search indexes share this list, so any tab that comes from a root file is indexed. The
  * specs delta tree is not here: it shows in the Specs tab, but its content does not go into search.
+ *
+ * It is name-sorted across all kinds, which is *not* the corpus order — search builds its documents from
+ * `rootArtifacts` (markdown and tasks before data) via `collectSearchDocuments`, so that a change matched
+ * by name alone is previewed from prose rather than from raw YAML. This function no longer has an in-repo
+ * caller; it stays because it is a published export of @spekjs/core.
  */
 export function listChangeArtifactFiles(changePath: string): string[] {
   return rootArtifacts(changePath)

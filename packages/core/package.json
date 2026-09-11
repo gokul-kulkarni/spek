@@ -52,6 +52,10 @@
     "./graph-node-id": {
       "types": "./dist/graph-node-id.d.ts",
       "import": "./dist/graph-node-id.js"
+    },
+    "./search": {
+      "types": "./dist/search.d.ts",
+      "import": "./dist/search.js"
     }
   },
   "scripts": {

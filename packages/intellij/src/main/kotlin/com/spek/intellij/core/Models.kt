@@ -84,6 +84,17 @@ data class ChangeArtifact(
     val id: String,
     val title: String,
     val kind: String,
+    /**
+     * The root filename this artifact was discovered from; null on the `specs` tree, which has no single
+     * file. It is the one key both search-document producers can order by: `title` is humanized for
+     * markdown and the bare filename for data, so sorting by it would only coincidentally agree.
+     */
+    val file: String? = null,
+    /**
+     * Raw file text. Carried on a tasks artifact too, alongside its parsed structure: the parser keeps
+     * section titles and task text and drops the rest, so a consumer holding only `tasks` holds less than
+     * the file says.
+     */
     val content: String? = null,
     val tasks: ParsedTasks? = null,
     val specs: List<ChangeSpec>? = null,
@@ -139,7 +150,10 @@ data class SearchResult(
     val slug: String? = null,
     val topic: String? = null,
     val context: String,
+    /** The root file the matching document came from. */
     val file: String? = null,
+    /** Changes only: lets the dialog mark a result that comes from archived content. */
+    val status: String? = null, // "active" | "archived"
 )
 
 @Serializable

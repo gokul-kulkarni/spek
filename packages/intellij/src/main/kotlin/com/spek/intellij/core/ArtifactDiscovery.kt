@@ -40,13 +40,20 @@ object ArtifactDiscovery {
     private fun buildArtifact(id: String, file: File, kind: ArtifactFiles.RootKind, content: String): ChangeArtifact =
         when (kind) {
             ArtifactFiles.RootKind.TASKS ->
-                ChangeArtifact(id = id, title = humanize(stripExt(file.name)), kind = "tasks", tasks = TaskParser.parse(content))
+                ChangeArtifact(
+                    id = id,
+                    title = humanize(stripExt(file.name)),
+                    kind = "tasks",
+                    file = file.name,
+                    tasks = TaskParser.parse(content),
+                    content = content,
+                )
             ArtifactFiles.RootKind.MARKDOWN ->
-                ChangeArtifact(id = id, title = humanize(stripExt(file.name)), kind = "markdown", content = content)
+                ChangeArtifact(id = id, title = humanize(stripExt(file.name)), kind = "markdown", file = file.name, content = content)
             // A data artifact keeps its extension in the title (`asyncapi.yaml`). The frontend derives the
             // fence language from the extension.
             ArtifactFiles.RootKind.DATA ->
-                ChangeArtifact(id = id, title = file.name, kind = "data", content = content)
+                ChangeArtifact(id = id, title = file.name, kind = "data", file = file.name, content = content)
         }
 
     /**

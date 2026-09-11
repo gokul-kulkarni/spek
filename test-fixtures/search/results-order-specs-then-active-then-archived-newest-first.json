@@ -1,0 +1,60 @@
+{
+  "name": "results-order-specs-then-active-then-archived-newest-first",
+  "note": "Archived slugs carry a date prefix, so descending puts the newest first \u2014 the direction every other list in spek sorts.",
+  "input": [
+    {
+      "type": "change",
+      "name": "2026-02-13-old",
+      "file": "proposal.md",
+      "text": "TOKEN",
+      "status": "archived"
+    },
+    {
+      "type": "change",
+      "name": "2026-08-22-new",
+      "file": "proposal.md",
+      "text": "TOKEN",
+      "status": "archived"
+    },
+    {
+      "type": "change",
+      "name": "active-one",
+      "file": "proposal.md",
+      "text": "TOKEN",
+      "status": "active"
+    },
+    {
+      "type": "spec",
+      "name": "a-topic",
+      "file": "spec.md",
+      "text": "TOKEN"
+    }
+  ],
+  "query": "TOKEN",
+  "expected": [
+    {
+      "type": "spec",
+      "topic": "a-topic",
+      "title": "a-topic",
+      "file": "spec.md"
+    },
+    {
+      "type": "change",
+      "slug": "active-one",
+      "title": "active one",
+      "status": "active"
+    },
+    {
+      "type": "change",
+      "slug": "2026-08-22-new",
+      "title": "new",
+      "status": "archived"
+    },
+    {
+      "type": "change",
+      "slug": "2026-02-13-old",
+      "title": "old",
+      "status": "archived"
+    }
+  ]
+}

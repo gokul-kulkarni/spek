@@ -1,0 +1,22 @@
+{
+  "name": "a-query-spanning-two-documents-matches-neither",
+  "note": "The static adapter joined every artifact's content and searched the join, so a query straddling a file boundary matched.",
+  "input": [
+    {
+      "type": "change",
+      "name": "c",
+      "file": "design.md",
+      "text": "alpha",
+      "status": "active"
+    },
+    {
+      "type": "change",
+      "name": "c",
+      "file": "proposal.md",
+      "text": "beta",
+      "status": "active"
+    }
+  ],
+  "query": "alphabeta",
+  "expected": []
+}
