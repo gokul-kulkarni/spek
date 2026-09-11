@@ -3,6 +3,35 @@
 `@spekjs/core` has its own version line, independent of the spek product releases tracked in the
 repository root `CHANGELOG.md`.
 
+## 1.12.0
+
+### Added
+
+- **`@spekjs/core/search`** — a browser-safe subpath holding the search rule, so a consumer serving a
+  pre-embedded payload runs the same code as one reading files. It exports `searchDocuments(docs,
+  query)`, the `SearchDocument` shape, `specSearchDocument` / `changeSearchDocuments` (documents from
+  already-loaded records), and `parseSlug`. Like `headings`, `artifact-order`, `schema-flow`,
+  `cli-budget` and `graph-node-id`, it imports no Node built-in.
+- **`collectSearchDocuments(basePath)` and `searchRepository(basePath, query)`** on the package index —
+  the filesystem side of the corpus, and the corpus plus the rule. A host with a repository path and a
+  query needs nothing else.
+- **`ChangeArtifact.file`** — the root filename an artifact was discovered from, absent on the `specs`
+  tree. It is the key to order artifacts by without a filesystem: `title` is humanized for markdown and
+  the bare filename for data, so two consumers sorting by it agree only by coincidence.
+- **`SearchResult.status`** — whether a change result comes from active or archived content. Optional,
+  so existing consumers are unaffected.
+
+### Changed
+
+- **A `tasks` artifact carries `content` as well as `tasks`.** The parser keeps section titles and task
+  text and drops the rest, including the column-0 block constructs that end an item, so a consumer
+  holding only the parsed structure holds less than the file says. Both are present now; neither field
+  changed shape.
+- **`parseSlug` moved to the search module** and is still exported from the package index and from
+  `scanner.js`, so no import breaks. Its description now collapses runs of `-` and `_` to a single
+  space rather than replacing each `-` individually — `a--b` reads `a b`, and an underscore reads as a
+  space. This is what makes a slug match the form a UI displays.
+
 ## 1.11.0
 
 ### Added
