@@ -3,6 +3,24 @@
 `@spekjs/core` has its own version line, independent of the spek product releases tracked in the
 repository root `CHANGELOG.md`.
 
+## 1.13.0
+
+### Changed
+
+- **`specHeadingLabel` matches the format keyword without regard to case.** `specHeadingLabel("requirement: Foo")`
+  now returns `"Foo"`; it previously returned the input unchanged, eliding only the exact spelling
+  `Requirement:` / `Scenario:`. The anchor at the start of the text and the colon after the keyword are what
+  carry the rule, and they are unchanged — `"Optional requirement: x"` and `"Requirements"` are still returned
+  as they are, as is a heading with nothing after the colon (`"requirement:"`), whose casing is preserved.
+
+  The exactness was justified by OpenSpec rejecting the variant. Its parser has folded case on
+  `### Requirement:` since v1.4.0 and on `#### Scenario:` since v1.9.0, so a consumer eliding only the exact
+  spelling shows the keyword as noise on a heading OpenSpec accepts.
+
+  This is a behaviour change for any consumer that displays the result. Nothing else moves: the signature is
+  the same, `extractHeadings` still never applies the label, and `Heading.text` / `Heading.slug` are still
+  derived from the authored text — every existing anchor is unchanged.
+
 ## 1.12.0
 
 ### Added
