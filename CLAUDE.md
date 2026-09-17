@@ -450,8 +450,27 @@ GET /api/openspec/search?dir=...&q=...              # full-text search
 - **BDD highlighting**: WHEN/GIVEN (blue), THEN (green), AND (gray), MUST/SHALL (red), and a badge per
   delta operation — ADDED orange, MODIFIED blue, REMOVED purple, RENAMED pink. **All four operations are
   marked**; two of them went unhandled for a long time because the only occurrences in-repo are section
-  headings, and `processChildren` runs on `p` / `li` / `strong` **only** — no heading has ever been
-  keyword-marked, so nothing looked broken. **REMOVED is deliberately not red**: red already means
+  headings, which are now excluded outright (see below). **Which casing is recognised is decided per
+  group, because the groups do not carry the same obligation** (issue #53):
+  - **Step keywords** also match in **title case** — but only inside a `<strong>` whose entire text is
+    that keyword, which is how the reporter's `**Given**` / `**When**` / `**Then**` is written. A
+    positional rule (first word of a paragraph or list item) was measured and rejected: it marks the
+    requirement prose that begins "When the server receives…, the server SHALL…", which every
+    repository has, to reach the 2% that write title case.
+  - **MUST/SHALL and the four delta operations stay uppercase-only.** Red means *normative*, and
+    lowercase "must" is an ordinary verb; `**Modified**:` heads an impact list in three of this repo's
+    own archived proposals and names no delta operation, which emphasis cannot tell from a mention of
+    one. Nothing below title case is recognised for any keyword — `**and**` in the wild is emphasis
+    inside a sentence, the same markup shape as `**And**` carrying a different meaning.
+  - **No keyword is marked inside a heading, in any spelling.** `processChildren` runs on `p` / `li` /
+    `strong`, which reads as excluding `h1`–`h6` — but `strong` is *inline*, so `## **ADDED**
+    Requirements` was marked while the unemphasised form every spec actually uses was not. That
+    asymmetry was an accident of the wiring; a `InHeadingContext` closes it. The two tests the rule
+    needs (is this bold run a bare keyword, is it in a heading) live in the `strong` component, not in
+    `highlightBddKeywords`, which sees one text run at a time and can answer neither.
+  - A matched keyword renders **as the document wrote it** — the table is keyed by the uppercase
+    spelling for lookup only, and `Given` is never re-cased to `GIVEN`.
+  **REMOVED is deliberately not red**: red already means
   "normative" here, and one colour carrying two meanings weakens both. Each hue is a **per-theme token**
   (`--color-kw-*`, `--color-badge-*`,
   `--color-code-text`), not a Tailwind palette class — those were shared by both themes, and no 400
@@ -459,8 +478,10 @@ GET /api/openspec/search?dir=...&q=...              # full-text search
   dark passed and hid it. **Adding a mark means adding both theme's values.** Pill fills stay plain
   `bg-*-500/20`: an alpha composites over whichever page colour is active and needs no token. The
   highlight must never *lower* the weight it found — a keyword inside `**bold**` inherits instead
-  (`BDD_WEIGHTS` is suppressed inside `<strong>`), or the emphasised word renders lighter than the
-  emphasis around it
+  (the table's `weight` is suppressed inside `<strong>`), or the emphasised word renders lighter than
+  the emphasis around it. Each keyword's entry carries its **group**, in the table rather than in a
+  list beside it, so adding a keyword forces the casing choice — a second list is how two of the four
+  delta operations once went unhandled
 - **Syntax highlighting** (fenced code blocks + `data` artifacts): `rehype-highlight` (`detect: false`) maps
   highlight.js `hljs-*` classes to per-theme `--color-hl-*` tokens (base, keyword, string, number, comment,
   punctuation). highlight.js's own theme is deliberately **not** imported — its hard-coded colours bypass the

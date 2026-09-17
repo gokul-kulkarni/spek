@@ -68,6 +68,15 @@ test("structural headings are untouched in both renderings", () => {
   assert.match(render("## Purpose\n\nProse.\n", true), /Purpose/);
 });
 
+test("a case variant of the keyword is elided, keeping the id its own text gives", () => {
+  // The rendered content and the TOC read the same heading by different paths — the content through
+  // this plugin, the TOC through `extractHeadings` — so they are pinned against each other.
+  const html = render("### requirement: Foo\n", true);
+  assert.match(html, /<h3 id="requirement-foo"/);
+  assert.match(html, />Foo</);
+  assert.ok(!html.includes("requirement: Foo"), "the keyword survived in the rendered heading");
+});
+
 test("a heading at another level is elided on the same terms", () => {
   // 層級不是判準：`extractHeadings` 只回 h2/h3，內文全部顯示，按層級 gate 兩邊就會不一致。
   assert.match(render("## Requirement: Foo\n", true), /<h2[^>]*>Foo<\/h2>/);

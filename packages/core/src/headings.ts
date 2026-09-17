@@ -11,8 +11,9 @@ export function slugifyHeading(text: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
-// OpenSpec 的 spec 格式關鍵字。大小寫敏感、只認行首 —— 見 specHeadingLabel。
-const SPEC_HEADING_KEYWORD_RE = /^(?:Requirement|Scenario):[ \t]*/;
+// OpenSpec's spec format keywords. Anchored at the start and requiring the colon; those two
+// conditions carry the rule, not the capitalisation — see specHeadingLabel.
+const SPEC_HEADING_KEYWORD_RE = /^(?:Requirement|Scenario):[ \t]*/i;
 
 /**
  * 一個 spec 標題要顯示成什麼：把開頭的格式關鍵字（`Requirement:` / `Scenario:`）拿掉。
@@ -28,6 +29,14 @@ const SPEC_HEADING_KEYWORD_RE = /^(?:Requirement|Scenario):[ \t]*/;
  *
  * 移除的範圍精確到「關鍵字 + 冒號 + 緊接的空白」，尾端不 trim：標題會繼續接到 label 帶不走的 markup
  * 上，`Requirement: The \`foo\` flag` 的文字段結尾那個空格一旦被 trim 掉，code span 就會黏在前一個字。
+ *
+ * The keyword is matched without regard to case. The anchor and the colon are what carry the rule:
+ * `Optional Requirement: x` is excluded because the keyword does not begin the text, and
+ * `Requirements` because no colon follows. Once those hold, `requirement:` names what `Requirement:`
+ * names. OpenSpec accepts the variant — its own header regex has folded case since v1.4.0 — so
+ * leaving the keyword visible would show the reader formatting noise instead of the heading's name.
+ * An earlier version of this rule required an exact match on the grounds that OpenSpec's parser would
+ * reject the variant; that has not been true for some time.
  */
 export function specHeadingLabel(text: string): string {
   const match = SPEC_HEADING_KEYWORD_RE.exec(text);

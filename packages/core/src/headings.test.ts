@@ -116,12 +116,29 @@ test("specHeadingLabel: a keyword-only heading is unchanged", () => {
   assert.equal(specHeadingLabel("Requirement:   "), "Requirement:   ");
 });
 
-test("specHeadingLabel: a case variant is unchanged", () => {
-  // OpenSpec 自己的 parser 不接受的寫法，這裡也不該悄悄正規化。
+test("specHeadingLabel: a case variant is elided too", () => {
+  // OpenSpec's own header regex folds case, so the variant is not malformed and the keyword is noise.
+  assert.equal(specHeadingLabel("requirement: lowercase keyword"), "lowercase keyword");
+  assert.equal(specHeadingLabel("SCENARIO: shouty keyword"), "shouty keyword");
+  assert.equal(specHeadingLabel("ReQuIrEmEnT: mixed"), "mixed");
+});
+
+test("specHeadingLabel: a case variant with nothing after the colon is unchanged", () => {
+  // Same reason as the uppercase case: there is no other name to show. The casing is the input's.
+  assert.equal(specHeadingLabel("requirement:"), "requirement:");
+});
+
+test("specHeadingLabel: a case variant that is not at the start is unchanged", () => {
   assert.equal(
-    specHeadingLabel("requirement: lowercase keyword"),
-    "requirement: lowercase keyword",
+    specHeadingLabel("Optional requirement: something"),
+    "Optional requirement: something",
   );
+});
+
+test("extractHeadings: a case variant yields the slug its own text gives", () => {
+  const headings = extractHeadings("### requirement: Foo\n");
+  assert.equal(headings[0].text, "requirement: Foo");
+  assert.equal(headings[0].slug, "requirement-foo");
 });
 
 test("specHeadingLabel: a keyword that is not at the start is unchanged", () => {

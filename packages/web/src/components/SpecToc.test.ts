@@ -36,3 +36,15 @@ test("the anchor is the slug of the authored text either way", () => {
 test("headings carrying no keyword are unaffected", () => {
   assert.match(render(true), />ADDED Requirements</);
 });
+
+test("a case variant of the keyword is dropped too", () => {
+  // The TOC reads the file's own line, so it is the surface a case variant reaches first.
+  const headings: Heading[] = [
+    { level: 3, text: "requirement: lowercase keyword", slug: "requirement-lowercase-keyword" },
+  ];
+  const html = renderToStaticMarkup(
+    createElement(MemoryRouter, null, createElement(SpecToc, { headings, specShaped: true })),
+  );
+  assert.match(html, />lowercase keyword</);
+  assert.match(html, /href="#requirement-lowercase-keyword"/);
+});

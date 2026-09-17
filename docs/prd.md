@@ -176,7 +176,9 @@ Each maps to one or more specs under `openspec/specs/`; that directory is author
   section, which matters most in a change's Specs tab where several specs stack in one view.
   Requirement and scenario headings drop their `Requirement:` / `Scenario:` keyword, which position
   already carries — in the rendered content, in both tables of contents and in the VS Code sidebar, so
-  the surfaces agree on what a heading is called. Presentation only: the file, the heading ids and every
+  the surfaces agree on what a heading is called. The keyword is recognised whatever its casing, as
+  OpenSpec's own parser accepts it that way; what carries the rule is the anchor at the start of the
+  heading and the colon after the keyword. Presentation only: the file, the heading ids and every
   anchor are unchanged.
 - **Changes browser** — active and archived changes; each change renders its disk-discovered
   artifacts as tabs (Proposal / Design / Tasks / Specs and any custom-schema artifacts), with
@@ -195,7 +197,9 @@ Each maps to one or more specs under `openspec/specs/`; that directory is author
   marked as derived**, never as a dependency the CLI blocks on.
 - **Full-text search** — `Cmd/Ctrl+K`, across specs and changes, with context previews.
 - **BDD syntax highlighting** — WHEN/GIVEN, THEN, AND, MUST/SHALL, and a badge for each delta
-  operation (ADDED / MODIFIED / REMOVED / RENAMED).
+  operation (ADDED / MODIFIED / REMOVED / RENAMED). Step keywords are also marked in title case
+  (`**Given**`, `**When**`) when the whole emphasised run is the keyword; `MUST`/`SHALL` and the delta
+  operations are marked in uppercase only, and no keyword is marked inside a heading.
 - **Live reload** — watches `openspec/` and refreshes on change, with an automatic **polling
   fallback** on filesystems that don't deliver native events (9p / drvfs / NFS / CIFS — devcontainer
   / WSL).

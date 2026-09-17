@@ -1,7 +1,7 @@
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Link } from "react-router-dom";
-import { type ReactNode } from "react";
+import { type ReactNode, createContext, useContext } from "react";
 import { slugifyHeading, specHeadingLabel } from "@spekjs/core/headings";
 import { rehypeHighlightNarrow } from "../utils/highlight";
 import {
@@ -104,72 +104,155 @@ interface MarkdownRendererProps {
   specShaped?: boolean;
 }
 
-// BDD 關鍵字樣式對應。
+// BDD keyword table.
 //
 // 文字色走 `--color-kw-*` / `--color-badge-*` token，因為淺色主題需要自己的一組值（原本兩個主題
 // 共用寫死的 Tailwind 400 色階，在淺色下全部不符 WCAG AA）。底色維持 `/20`，會自動疊在當前主題的
 // 頁面底色上，不需要 token。
 //
-// 字重不放在這裡而放 `BDD_WEIGHTS`：關鍵字若出現在 `**粗體**` 內，highlight 不得把字重調低。
-const BDD_KEYWORDS: Record<string, string> = {
-  WHEN: "bg-blue-500/20 text-kw-when px-1.5 py-0.5 rounded text-sm",
-  GIVEN: "bg-blue-500/20 text-kw-when px-1.5 py-0.5 rounded text-sm",
-  THEN: "bg-green-500/20 text-kw-then px-1.5 py-0.5 rounded text-sm",
-  AND: "bg-gray-500/20 text-kw-and px-1.5 py-0.5 rounded text-sm",
-  MUST: "text-kw-normative",
-  SHALL: "text-kw-normative",
-  ADDED: "bg-orange-500/20 text-badge-added px-1.5 py-0.5 rounded text-xs",
-  MODIFIED: "bg-blue-500/20 text-badge-modified px-1.5 py-0.5 rounded text-xs",
+// `weight` applies only outside `<strong>` — see highlightBddKeywords.
+//
+// `group` decides whether this keyword's non-uppercase spellings are recognised, and it lives in the
+// table rather than in a list beside it. The three groups do not carry the same obligation: OpenSpec
+// never parses a step keyword, matches `SHALL`/`MUST` case-sensitively, and the delta operations'
+// lowercase forms are common words in prose. Keeping the group here forces the choice when a keyword
+// is added — a second list beside the table is how two of the four delta operations once went
+// unhandled.
+type BddGroup = "step" | "normative" | "delta";
+
+interface BddKeyword {
+  group: BddGroup;
+  className: string;
+  weight: string;
+}
+
+const BDD_KEYWORDS: Record<string, BddKeyword> = {
+  WHEN: { group: "step", className: "bg-blue-500/20 text-kw-when px-1.5 py-0.5 rounded text-sm", weight: "font-semibold" },
+  GIVEN: { group: "step", className: "bg-blue-500/20 text-kw-when px-1.5 py-0.5 rounded text-sm", weight: "font-semibold" },
+  THEN: { group: "step", className: "bg-green-500/20 text-kw-then px-1.5 py-0.5 rounded text-sm", weight: "font-semibold" },
+  AND: { group: "step", className: "bg-gray-500/20 text-kw-and px-1.5 py-0.5 rounded text-sm", weight: "font-semibold" },
+  MUST: { group: "normative", className: "text-kw-normative", weight: "font-bold" },
+  SHALL: { group: "normative", className: "text-kw-normative", weight: "font-bold" },
+  ADDED: { group: "delta", className: "bg-orange-500/20 text-badge-added px-1.5 py-0.5 rounded text-xs", weight: "font-semibold" },
+  MODIFIED: { group: "delta", className: "bg-blue-500/20 text-badge-modified px-1.5 py-0.5 rounded text-xs", weight: "font-semibold" },
   // REMOVED 不用紅色：紅色在這個 renderer 已經是「規範性」（MUST/SHALL）的意思，
   // 一個顏色扛兩種意義會讓兩邊都變弱。改用紫與粉，與既有的橘/藍/綠/紅/灰都拉得開。
-  REMOVED: "bg-purple-500/20 text-badge-removed px-1.5 py-0.5 rounded text-xs",
-  RENAMED: "bg-pink-500/20 text-badge-renamed px-1.5 py-0.5 rounded text-xs",
+  REMOVED: { group: "delta", className: "bg-purple-500/20 text-badge-removed px-1.5 py-0.5 rounded text-xs", weight: "font-semibold" },
+  RENAMED: { group: "delta", className: "bg-pink-500/20 text-badge-renamed px-1.5 py-0.5 rounded text-xs", weight: "font-semibold" },
 };
 
-// 只在 `<strong>` 之外套用 —— 見 highlightBddKeywords。
-const BDD_WEIGHTS: Record<string, string> = {
-  WHEN: "font-semibold",
-  GIVEN: "font-semibold",
-  THEN: "font-semibold",
-  AND: "font-semibold",
-  MUST: "font-bold",
-  SHALL: "font-bold",
-  ADDED: "font-semibold",
-  MODIFIED: "font-semibold",
-  REMOVED: "font-semibold",
-  RENAMED: "font-semibold",
-};
-
+// Both spellings are matched here and `isMarkableSpelling` decides which are kept, so that what is
+// recognised is stated in one place and the pattern need not know about groups. Uppercase comes
+// first; alternation is leftmost-first.
+const titleCase = (k: string) => k[0] + k.slice(1).toLowerCase();
 const BDD_PATTERN = new RegExp(
-  `\\b(${Object.keys(BDD_KEYWORDS).join("|")})\\b`,
+  `\\b(${Object.keys(BDD_KEYWORDS)
+    .flatMap((k) => [k, titleCase(k)])
+    .join("|")})\\b`,
   "g"
 );
+
+/**
+ * Whether a `<strong>`'s content is a bare keyword — the whole bold run being that one word.
+ *
+ * **Only the `strong` component can decide this; the helper cannot.** `highlightBddKeywords` sees one
+ * text run at a time: the children of `**Given \`x\`**` are `["Given ", <code>]`, so the helper holds
+ * only `"Given "` with no sight of the sibling, and would read a bolded clause as a bare label.
+ *
+ * Returns the normalised uppercase spelling (the table's key), never the matched text — what gets
+ * displayed is always what the document wrote.
+ */
+function bareKeywordOf(children: ReactNode): string | null {
+  const text =
+    typeof children === "string"
+      ? children
+      : Array.isArray(children) && children.length === 1 && typeof children[0] === "string"
+        ? children[0]
+        : null;
+  if (text === null) return null;
+  const key = text.trim().toUpperCase();
+  return key in BDD_KEYWORDS ? key : null;
+}
+
+/**
+ * Whether this spelling may be marked.
+ *
+ * Uppercase always may, in any position, as before. Below that, only a step keyword, only in title
+ * case, and only as a bare keyword. The measurements behind each clause are in the
+ * `bdd-keyword-casing` change's design.md:
+ *
+ * - A positional rule instead (first word of a paragraph or list item) marks requirement prose like
+ *   `When the server receives …, the server SHALL …`, which every repository has — not just the 2%
+ *   that write title case.
+ * - `SHALL`/`MUST` are not relaxed: red means *normative* in this renderer, and lowercase "must" is
+ *   an ordinary verb.
+ * - The delta operations are not relaxed: `**Modified**:` heads an impact list in three of this
+ *   repository's own proposals, and emphasis cannot tell that from a mention of the operation.
+ * - Nothing below title case: `**and**` in the corpus is emphasis inside a sentence — the same markup
+ *   shape as `**And**`, carrying a different meaning.
+ */
+function isMarkableSpelling(matched: string, keyword: string, isBareKeyword: boolean): boolean {
+  if (matched === keyword) return true;
+  if (BDD_KEYWORDS[keyword].group !== "step") return false;
+  return isBareKeyword && matched === keyword[0] + keyword.slice(1).toLowerCase();
+}
 
 /**
  * `inStrong` 時不輸出 highlight 自己的字重，改為繼承。否則 `**SHALL**` 會被 span 的
  * `font-semibold`（600）以 specificity 蓋過父層 `<strong>` 的 700，作者標了粗體的字反而變細 ——
  * 這裡的字重都 ≤ bold，繼承一律正確。
  */
-function highlightBddKeywords(text: string, inStrong: boolean): ReactNode[] {
+/**
+ * No keyword is marked inside a heading.
+ *
+ * **This is not what the renderer did before, and closing it is part of this change.**
+ * `processChildren` is wired to `p`/`li`/`strong`, which reads as excluding `h1`-`h6`; but `strong` is
+ * an inline component, so a `<strong>` inside a heading reaches it like any other.
+ * `## **ADDED** Requirements` was marked while the unemphasised form every spec actually uses was not.
+ * That asymmetry was an accident of the wiring rather than a decision, and admitting title case would
+ * have widened it.
+ *
+ * Context rather than a rehype plugin: a heading component renders its own children, so the value
+ * flows down the render tree to `strong` with no plugin ordering to get right.
+ */
+const InHeadingContext = createContext(false);
+
+interface BddContext {
+  /** Inside `<strong>`: emit no weight of our own, inherit instead. */
+  inStrong: boolean;
+  /** The whole bold run is one keyword — decided by the `strong` component, invisible to the helper. */
+  isBareKeyword: boolean;
+  /** Inside a heading: nothing is marked. */
+  inHeading: boolean;
+}
+
+const PLAIN: BddContext = { inStrong: false, isBareKeyword: false, inHeading: false };
+
+function highlightBddKeywords(text: string, ctx: BddContext): ReactNode[] {
   const parts: ReactNode[] = [];
   let lastIndex = 0;
   let match: RegExpExecArray | null;
 
   BDD_PATTERN.lastIndex = 0;
   while ((match = BDD_PATTERN.exec(text)) !== null) {
-    if (match.index > lastIndex) {
-      parts.push(text.slice(lastIndex, match.index));
+    const matched = match[1];
+    const keyword = matched.toUpperCase();
+    if (!ctx.inHeading && isMarkableSpelling(matched, keyword, ctx.isBareKeyword)) {
+      if (match.index > lastIndex) {
+        parts.push(text.slice(lastIndex, match.index));
+      }
+      const entry = BDD_KEYWORDS[keyword];
+      const className = ctx.inStrong
+        ? entry.className
+        : `${entry.className} ${entry.weight}`;
+      // Renders `matched`, not `keyword`: spek shows what the file says, so `Given` is never re-cased.
+      parts.push(
+        <span key={match.index} className={className}>
+          {matched}
+        </span>
+      );
+      lastIndex = BDD_PATTERN.lastIndex;
     }
-    const keyword = match[1];
-    const className = inStrong
-      ? BDD_KEYWORDS[keyword]
-      : `${BDD_KEYWORDS[keyword]} ${BDD_WEIGHTS[keyword]}`;
-    parts.push(
-      <span key={match.index} className={className}>
-        {keyword}
-      </span>
-    );
-    lastIndex = BDD_PATTERN.lastIndex;
   }
 
   if (lastIndex < text.length) {
@@ -179,20 +262,35 @@ function highlightBddKeywords(text: string, inStrong: boolean): ReactNode[] {
   return parts;
 }
 
-function processChildren(children: ReactNode, inStrong = false): ReactNode {
+function processChildren(children: ReactNode, ctx: BddContext = PLAIN): ReactNode {
   if (typeof children === "string") {
-    return highlightBddKeywords(children, inStrong);
+    return highlightBddKeywords(children, ctx);
   }
   if (Array.isArray(children)) {
     return children.map((child, i) =>
       typeof child === "string" ? (
-        <span key={i}>{highlightBddKeywords(child, inStrong)}</span>
+        <span key={i}>{highlightBddKeywords(child, ctx)}</span>
       ) : (
         child
       )
     );
   }
   return children;
+}
+
+/**
+ * `<strong>` is the only place able to make both decisions: whether the whole bold run is one keyword
+ * (`bareKeywordOf`) and whether it sits in a heading (`InHeadingContext`). `highlightBddKeywords` sees
+ * one text run at a time, with no sight of its siblings or its ancestors.
+ */
+function StrongWithKeywords({ children }: { children: ReactNode }) {
+  const inHeading = useContext(InHeadingContext);
+  const ctx: BddContext = {
+    inStrong: true,
+    isBareKeyword: bareKeywordOf(children) !== null,
+    inHeading,
+  };
+  return <strong className="font-bold text-text-primary">{processChildren(children, ctx)}</strong>;
 }
 
 // h2 的兩套排版。差別只在 spec 形狀的文件裡 h2 是結構分隔，不是內容標題 —— 見 `specShaped`。
@@ -241,26 +339,28 @@ export function MarkdownRenderer({ content, specTopics, idPrefix, fold, specShap
           },
           // 標題
           h1({ children }) {
-            return <h1 className="text-2xl font-bold mt-6 mb-4 text-text-primary">{children}</h1>;
+            return <h1 className="text-2xl font-bold mt-6 mb-4 text-text-primary"><InHeadingContext.Provider value={true}>{children}</InHeadingContext.Provider></h1>;
           },
           h2({ id, children }) {
-            return <h2 id={id} className={specShaped ? H2_STRUCTURAL : H2_CONTENT}>{children}</h2>;
+            return <h2 id={id} className={specShaped ? H2_STRUCTURAL : H2_CONTENT}><InHeadingContext.Provider value={true}>{children}</InHeadingContext.Provider></h2>;
           },
           h3({ id, children }) {
-            return <h3 id={id} className="text-lg font-semibold mt-5 mb-2 text-text-primary scroll-mt-20">{children}</h3>;
+            return <h3 id={id} className="text-lg font-semibold mt-5 mb-2 text-text-primary scroll-mt-20"><InHeadingContext.Provider value={true}>{children}</InHeadingContext.Provider></h3>;
           },
           h4({ children }) {
-            return <h4 className="text-base font-semibold mt-4 mb-2 text-text-secondary">{children}</h4>;
+            return <h4 className="text-base font-semibold mt-4 mb-2 text-text-secondary"><InHeadingContext.Provider value={true}>{children}</InHeadingContext.Provider></h4>;
           },
           h5({ children }) {
-            return <h5 className="text-sm font-semibold mt-3 mb-1 text-text-secondary">{children}</h5>;
+            return <h5 className="text-sm font-semibold mt-3 mb-1 text-text-secondary"><InHeadingContext.Provider value={true}>{children}</InHeadingContext.Provider></h5>;
           },
           h6({ children }) {
-            return <h6 className="text-sm font-medium mt-3 mb-1 text-text-muted">{children}</h6>;
+            return <h6 className="text-sm font-medium mt-3 mb-1 text-text-muted"><InHeadingContext.Provider value={true}>{children}</InHeadingContext.Provider></h6>;
           },
           // 強調
           strong({ children }) {
-            return <strong className="font-bold text-text-primary">{processChildren(children, true)}</strong>;
+            return (
+              <StrongWithKeywords>{children}</StrongWithKeywords>
+            );
           },
           em({ children }) {
             return <em className="italic text-text-secondary">{children}</em>;
