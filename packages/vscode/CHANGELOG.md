@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.18.0
+
+**Highlight: a keyword's casing is read the way OpenSpec reads it.** spek marked one casing rule across every keyword it highlights, and the keywords do not carry the same obligation. A scenario body is free text that no version of OpenSpec parses, so uppercase `WHEN` / `THEN` is a template convention — a spec written with `**Given**` / `**When**` / `**Then**` is perfectly valid and rendered with no highlighting at all. `SHALL` / `MUST` is the opposite: OpenSpec matches it case-sensitively. The rule is now decided per keyword group.
+
+- **Title-case Gherkin steps are highlighted** ([#53](https://github.com/spekhq/spek/issues/53)). `Given`, `When`, `Then` and `And` are marked when the whole emphasised run is the keyword — `**Given** a project is registered`. Uppercase is unchanged
+- **Ordinary prose is not marked.** A requirement beginning "When the server receives a request, it SHALL respond" marks only `SHALL`, as before
+- **`MUST` / `SHALL` and the four delta operations stay uppercase-only.** Red means *normative* here and lowercase "must" is an ordinary verb; `**Modified**:` heads an impact list in many proposals and names no delta operation there
+- **No keyword is highlighted inside a heading.** An emphasised one used to be — `## **ADDED** Requirements` showed a badge while the unemphasised form every spec actually uses did not
+- **A requirement or scenario heading drops its keyword whatever the casing**, in the panel and in the Specs sidebar alike. `### requirement: Foo` displays as `Foo`, as `### Requirement: Foo` already did
+
 ## 1.17.0
 
 **Highlight: search finds what is actually there.** spek implemented search four times — the web server, the VS Code host, the IntelliJ server and the static build — and the four answered the same query differently. The host carried a verbatim copy of the web server's index, which scored an exact match out of the results once it sat more than about 40 characters into a file, so search was effectively blind past the first line of anything. The rule is now stated once, and every surface runs it.

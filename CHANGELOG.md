@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.18.0
+
+**Highlight: a keyword's casing is read the way OpenSpec reads it.** spek marked one casing rule across every keyword it highlights, and the keywords do not carry the same obligation. A scenario body is free text that no version of OpenSpec parses, so uppercase `WHEN` / `THEN` is a template convention — a spec written with `**Given**` / `**When**` / `**Then**` is perfectly valid and rendered with no highlighting at all. `SHALL` / `MUST` is the opposite: OpenSpec matches it case-sensitively and reports a requirement carrying no uppercase one. The rule is now decided per keyword group, against what OpenSpec actually does with each.
+
+- **Title-case Gherkin steps are highlighted** ([#53](https://github.com/spekhq/spek/issues/53)). `Given`, `When`, `Then` and `And` are marked when the whole emphasised run is the keyword — `**Given** a project is registered` — which is how such specs are written. Uppercase is unchanged
+- **Ordinary prose is not marked.** A requirement beginning "When the server receives a request, it SHALL respond" marks only `SHALL`, as before. Recognising a step by its position instead was measured across 300 specs from 242 repositories and rejected: it marks that sentence, which every repository has, to reach the 2% that write title case
+- **`MUST` / `SHALL` and the four delta operations stay uppercase-only.** Red means *normative* here and lowercase "must" is an ordinary verb; `**Modified**:` heads an impact list in many proposals and names no delta operation there
+- **No keyword is highlighted inside a heading.** An emphasised one used to be — `## **ADDED** Requirements` showed a badge while the unemphasised form every spec actually uses did not
+- **A requirement or scenario heading drops its keyword whatever the casing.** `### requirement: Foo` displays as `Foo`, in the rendered content and in every table of contents, as `### Requirement: Foo` already did. OpenSpec's own parser accepts the variant, so leaving the keyword visible showed formatting noise in place of the heading's name
+- *Internal:* `@spekjs/core` 1.13.0 changes `specHeadingLabel`'s behaviour on a heading whose keyword differs only in case
+
 ## 1.17.0
 
 **Highlight: search finds what is actually there.** spek implemented search four times — the web server, the VS Code host, the IntelliJ server and the static build — and the four answered the same query differently. The web index scored an exact match out of the results once it sat more than about 40 characters into a file, so search was effectively blind past the first line of anything; the VS Code host carried a copy of the same defect. The rule is now stated once, and every surface runs it.

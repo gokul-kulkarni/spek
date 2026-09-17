@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.18.0
+
+**Highlight: a keyword's casing is read the way OpenSpec reads it.** spek marked one casing rule across every keyword it highlights, and the keywords do not carry the same obligation. A scenario body is free text that no version of OpenSpec parses, so uppercase `WHEN` / `THEN` is a template convention — a spec written with `**Given**` / `**When**` / `**Then**` is perfectly valid and rendered with no highlighting at all. `SHALL` / `MUST` is the opposite: OpenSpec matches it case-sensitively. The rule is now decided per keyword group.
+
+- **Title-case Gherkin steps are highlighted** ([#53](https://github.com/spekhq/spek/issues/53)). `Given`, `When`, `Then` and `And` are marked when the whole emphasised run is the keyword — `**Given** a project is registered`. Uppercase is unchanged
+- **Ordinary prose is not marked.** A requirement beginning "When the server receives a request, it SHALL respond" marks only `SHALL`, as before
+- **`MUST` / `SHALL` and the four delta operations stay uppercase-only.** Red means *normative* here and lowercase "must" is an ordinary verb; `**Modified**:` heads an impact list in many proposals and names no delta operation there
+- **No keyword is highlighted inside a heading.** An emphasised one used to be — `## **ADDED** Requirements` showed a badge while the unemphasised form every spec actually uses did not
+- **A requirement or scenario heading drops its keyword whatever the casing.** `### requirement: Foo` displays as `Foo`, in the tool window's content and table of contents, as `### Requirement: Foo` already did
+
+The tool window's own Specs/Changes tree is unaffected: it lists specs and changes, not their headings.
+
 ## 1.17.0
 
 **Highlight: search answers the same query the same way spek's other surfaces do.** spek implemented search four times, and the four disagreed about what is indexed, what counts as a match and how many results one change may produce. The rule is now stated once and mirrored here in Kotlin, with a shared fixture corpus holding the two implementations in agreement.

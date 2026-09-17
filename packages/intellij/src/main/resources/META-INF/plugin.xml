@@ -25,15 +25,14 @@
     ]]></description>
 
     <change-notes><![CDATA[
-        <p><b>1.17.0</b></p>
-        <p><b>Search answers the same query the same way spek's other surfaces do.</b> spek implemented search four times, and the four disagreed about what is indexed, what counts as a match and how many results one change may produce. The rule is now stated once and mirrored here in Kotlin, with a shared fixture corpus holding the two implementations in agreement.</p>
+        <p><b>1.18.0</b></p>
+        <p><b>A keyword's casing is read the way OpenSpec reads it.</b> spek marked one casing rule across every keyword it highlights, and the keywords do not carry the same obligation. A scenario body is free text that no version of OpenSpec parses, so uppercase <code>WHEN</code> / <code>THEN</code> is a template convention &mdash; a spec written with <code>**Given**</code> / <code>**When**</code> / <code>**Then**</code> is perfectly valid and was rendered with no highlighting at all. <code>SHALL</code> / <code>MUST</code> is the opposite: OpenSpec matches it case-sensitively. The rule is now decided per keyword group.</p>
         <ul>
-            <li><b>A change is found by the name its result card shows</b>, so a query copied off a result finds that result.</li>
-            <li><b>A result comes from the file that actually contains the query.</b> A name match used to be answered by whichever file came first, handing back a snippet with nothing the reader typed in it.</li>
-            <li><b>Each result says which artifact answered and marks archived changes</b>, so a row explains itself even when there is nothing to highlight in it.</li>
-            <li><b>Results are ordered with the most recently archived change first</b>, rather than the oldest.</li>
-            <li><b>A search request with no query is rejected rather than treated as an empty search</b>, matching the web server.</li>
-            <li><b>Task text and every root artifact file are indexed</b> from the same listing the tabs come from.</li>
+            <li><b>Title-case Gherkin steps are highlighted.</b> <code>Given</code>, <code>When</code>, <code>Then</code> and <code>And</code> are marked when the whole emphasised run is the keyword. Uppercase is unchanged.</li>
+            <li><b>Ordinary prose is not marked.</b> A requirement beginning &quot;When the server receives a request, it SHALL respond&quot; marks only <code>SHALL</code>, as before.</li>
+            <li><b><code>MUST</code> / <code>SHALL</code> and the four delta operations stay uppercase-only.</b> Red means <i>normative</i> here and lowercase &quot;must&quot; is an ordinary verb.</li>
+            <li><b>No keyword is highlighted inside a heading.</b> An emphasised one used to be, while the unemphasised form every spec actually uses was not.</li>
+            <li><b>A requirement or scenario heading drops its keyword whatever the casing.</b> <code>### requirement: Foo</code> displays as <code>Foo</code>, as <code>### Requirement: Foo</code> already did.</li>
         </ul>
     ]]></change-notes>
 
