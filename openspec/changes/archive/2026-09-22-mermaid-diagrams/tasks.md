@@ -48,7 +48,7 @@
 
 - [x] 8.1 Add a test that a diagram whose label text contains HTML or a `<script>` element produces no such markup in the container, confirming the strict security level is in force. Verify `npm test -w @spekjs/web` passes.
 - [x] 8.2 Build the VS Code webview (`npm run build:webview`), package and run it, and verify a diagram shows its source with no error state and no CSP violation in the developer console. The drawing path is not exercised here — this build does not draw (design D2).
-- [ ] 8.3 Build the IntelliJ webview (`npm run build:intellij`) and verify the same in the tool window, remembering that `src/main/resources/webview/` is a build artifact and a stale one shows old UI.
+- [x] 8.3 Build the IntelliJ webview (`npm run build:intellij`) and verify the same in the tool window, remembering that `src/main/resources/webview/` is a build artifact and a stale one shows old UI.
 
 ## 9. Build exclusion and size
 
