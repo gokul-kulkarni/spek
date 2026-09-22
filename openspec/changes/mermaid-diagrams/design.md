@@ -44,6 +44,23 @@ See `proposal.md` — Why. The constraints that shape the approach, all of them 
 
 ## Decisions
 
+The shape the decisions below arrive at, since several of them only make sense against it:
+
+```mermaid
+graph TD
+  Fence["a mermaid fence in Markdown"] --> Plugin["rehypeSpekMermaid"]
+  File["a root .mmd file"] --> Tab["ChangeDetail diagram tab"]
+  Plugin --> Component["MermaidDiagram"]
+  Tab --> Component
+  Component --> Build{"does this build draw?"}
+  Build -->|Web| Draw["draw it, themed from the tokens"]
+  Build -->|"webview, IntelliJ, demo"| Src["show the source"]
+```
+
+(No `<br/>` in these labels: `securityLevel: "strict"` sanitises the tag away and joins the words
+either side of it — which is itself worth knowing, and is the sort of thing this change now lets a
+reader discover by looking.)
+
 ### D1. Delegation happens in a rehype plugin that runs before the highlighter, not in the `code` component
 
 `MarkdownRenderer`'s `code` component cannot do this cleanly: the `pre` component still wraps whatever
@@ -195,13 +212,31 @@ The repository's web tests are `node:test` plus `renderToStaticMarkup`. There is
 rendering runs no effects, so a component test can only ever observe the first state — stubbing the
 Mermaid module would buy nothing, because nothing would call it.
 
-So the behaviour that matters is extracted to where it can be driven: `utils/diagramState.ts` is the
-status machine (idle / unavailable / drawing / drawn / failed, plus the source toggle and a generation
-counter that drops superseded results) and `utils/diagramZoom.ts` is the magnification arithmetic. Both
-are pure and are tested through every transition, including the failure path and the mid-draw theme
-change, which a stub could not produce deterministically. `rehypeSpekMermaid` and the theme table are
-pure too. What static rendering does assert is the state a reader meets first, which is exactly the one
-that must not be a code block.
+So the behaviour that matters is extracted to where it can be driven. `utils/diagramState.ts` is the
+status machine:
+
+```mermaid
+stateDiagram-v2
+  [*] --> idle: build draws
+  [*] --> unavailable: build does not draw
+  idle --> drawing: shown
+  drawing --> drawn: drawSucceeded
+  drawing --> failed: drawFailed
+  drawn --> drawing: invalidated
+  failed --> drawing: invalidated
+```
+
+`unavailable` is terminal — `shown` and `invalidated` are both no-ops there, because there is nothing
+to draw and nothing to redraw. A `drawSucceeded` or `drawFailed` carrying a stale generation is
+dropped, so a theme toggle part-way through a draw cannot land the old SVG on top of the new one.
+
+The source toggle rides alongside as a separate flag, so asking for the source never leaves the status
+it was in. `utils/diagramZoom.ts` holds the magnification arithmetic on the same terms.
+
+Both are pure and are tested through every transition, including the failure path and the mid-draw theme
+change — neither of which a stubbed module could produce deterministically. `rehypeSpekMermaid` and the
+theme table are pure too. What static rendering does assert is the state a reader meets first, which is
+exactly the one that must not be a code block.
 
 This follows the precedent already in the repository — `refreshTracker`, `foldSections` and the Kotlin
 `TreeRefreshGate` are all pure logic lifted out of a component for the same reason.

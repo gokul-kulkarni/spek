@@ -213,7 +213,16 @@ export function MermaidDiagram({ source }: MermaidDiagramProps) {
   return (
     <div
       ref={containerRef}
-      className="border border-border rounded-lg bg-bg-tertiary mb-4 overflow-hidden"
+      // `[overflow-wrap:normal]` is required, not cosmetic. MarkdownRenderer sets
+      // `overflow-wrap: anywhere` on `.markdown-body` so that bare paths in prose cannot widen the
+      // page, and that inherits straight into the HTML labels Mermaid renders inside `foreignObject`.
+      // Mermaid sizes each label by measuring it first and then fixes the box, assuming a long word
+      // stays on one line — so an inherited "break anywhere" silently wraps `MermaidDiagram` after
+      // `MermaidDiagra`, puts the `m` on a second line outside a box that was sized for one, and the
+      // browser paints no second line. The label looks truncated while the DOM holds the full text,
+      // so nothing that inspects `textContent` can see it. Resetting it here keeps Mermaid's own
+      // measurement true.
+      className="border border-border rounded-lg bg-bg-tertiary mb-4 overflow-hidden [overflow-wrap:normal]"
       data-spek-diagram={state.status.kind}
     >
       <div className="flex items-center justify-end gap-1 px-2 py-1 border-b border-border">

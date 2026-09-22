@@ -125,3 +125,15 @@ test("an html-looking label in a source view is escaped", () => {
   const html = render("```mermaid\ngraph TD\n  A[<img onerror=x>]-->B\n```\n");
   assert.equal(html.includes("<img"), false);
 });
+
+test("the diagram container resets overflow-wrap", () => {
+  // Not cosmetic, and not something any other test in this repo could catch. MarkdownRenderer sets
+  // `overflow-wrap: anywhere` on `.markdown-body`, which inherits into the HTML labels Mermaid puts
+  // inside `foreignObject`. Mermaid measures each label and then fixes the box around it, so an
+  // inherited "break anywhere" wraps a long single word — `MermaidDiagram` breaks after
+  // `MermaidDiagra` — onto a second line outside a box sized for one, and the browser paints no
+  // second line. The DOM still holds the whole string, so `textContent` looks correct while the
+  // reader sees a truncated label; it was found by looking at the rendered page, not by a test.
+  const html = render("```mermaid\ngraph TD\n  A[MermaidDiagram] --> B\n```\n");
+  assert.match(html, /\[overflow-wrap:normal\]/);
+});
