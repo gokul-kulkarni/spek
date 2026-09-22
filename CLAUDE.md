@@ -159,7 +159,12 @@ behavior lives in `openspec/specs/`; the key entry points:
   — plus the one `rootKind` classifier that decides which root file is which kind; `artifact-discovery.ts` reads
   content and builds the objects. count, search, and discovery all derive from `rootKind`, so a shown tab is always
   counted and searchable. Kotlin mirrors the pair: `ArtifactFiles.kt` + `ArtifactDiscovery.kt`. A `data` artifact
-  renders as a syntax-highlighted code block (fence language from the extension), with no TOC and no folding
+  renders as a syntax-highlighted code block (fence language from the extension), with no TOC and no folding. A
+  `diagram` artifact (`.mmd` / `.mermaid`) is a **separate kind, not another data extension**: `data` means "show
+  this file's text", `diagram` means "show what this file describes", and folding them together would make the raw
+  source the only rendering a diagram file could ever get. `DIAGRAM_EXTENSIONS` sits beside `DATA_EXTENSIONS` so every
+  watcher derives its set from one source. Both kinds keep their extension in the title and share `rootArtifacts`'
+  second bucket, so `flow.md` keeps the id `flow` and `flow.mmd` becomes `flow-2`
 - `readSpec` / `readSpecAtChange`, `buildGraphData` / `buildGraphDataAggregated` (aggregated node ids
   `change:<wtKey>:<slug>` avoid collisions), `listWorktrees`, `parseTasks`
 - **jj workspace support (EXPERIMENTAL)**: `listJjWorkspaces(dir)` (`jj workspace list`),
@@ -482,6 +487,38 @@ GET /api/openspec/search?dir=...&q=...              # full-text search
   the emphasis around it. Each keyword's entry carries its **group**, in the table rather than in a
   list beside it, so adding a keyword forces the casing choice — a second list is how two of the four
   delta operations once went unhandled
+- **Mermaid diagrams — only the Web build draws them, and that is a decision, not an oversight.** A
+  ` ```mermaid ` fence (rewritten by `rehypeSpekMermaid`, which runs **before** the highlighter so it
+  never sees the block) and a root `.mmd` / `.mermaid` artifact both go through `MermaidDiagram.tsx`.
+  The default ESM build puts mermaid in lazy chunks a repository with no diagrams never fetches. The
+  VS Code, IntelliJ and demo builds are `format: "iife"` with `manualChunks: undefined` and **cannot
+  code-split**, so the same dynamic import is *inlined*: measured **718,653 B → 5,952,548 B**, and
+  `docs/demo.html` — committed to the repo on every release — would go 4.5 MB → ≈9.9 MB. So those three
+  exclude mermaid outright and show diagram source instead, which the `diagram-rendering` spec states as
+  how that surface shows a diagram rather than as a failure.
+  Two mechanisms, doing two jobs: `define: { __SPEK_DRAWS_DIAGRAMS__ }` decides what the reader sees (a
+  terminal `unavailable` state, source shown calmly, no control offering a drawing that does not exist),
+  and `resolve.alias: { mermaid: … }` to a `export default null` stand-in decides whether the bytes
+  exist — tree-shaking a dynamic import behind a flag is a hope, an alias is a fact. `diagramBuilds.test.ts`
+  asserts both across all four configs, because **a bundle eight times too big fails no type-check, no
+  lint and no other test**; it just lands in `docs/`.
+  Three more things that are not obvious: the SVG is inserted as markup under `securityLevel: "strict"`
+  and `bindFunctions` is **never** called (diagram source is repository content, and the webviews run
+  with more privilege than a browser tab); drawing is deferred to `IntersectionObserver`, because mermaid
+  lays out by measuring the DOM and inside a closed `<details>` — which is how `spec-section-folding`
+  renders every scenario — every measurement is zero; and the state machine lives in
+  `utils/diagramState.ts` rather than the component, since the web tests are `node:test` +
+  `renderToStaticMarkup`, which runs no effects and so can only ever observe the first state.
+- **A palette handed to a renderer that draws its own markup is measured at the declaration.** Mermaid
+  writes our colours into an SVG that does not exist until a reader opens the page, so neither the
+  `global.css` parse nor any source scan in `contrast.test.ts` can see one of them — the check would find
+  nothing to report, which is indistinguishable from finding nothing wrong. This is the SVG-attribute gap
+  arriving by a second route, and it arrives whenever a capability is added by adopting a renderer rather
+  than by writing markup. `utils/diagramTheme.ts` is therefore the complete set of colours handed over,
+  each naming its `--color-*` token and the floor its use answers to, with `DECLARED_DEFAULTS` listing
+  what is deliberately left to mermaid and why. `contrast.test.ts` imports and measures it; a literal in
+  that table fails its own test. `theme: "base"` specifically — every other built-in mermaid theme ignores
+  most `themeVariables`, so a partial override silently leaves the library's palette in place.
 - **Syntax highlighting** (fenced code blocks + `data` artifacts): `rehype-highlight` (`detect: false`) maps
   highlight.js `hljs-*` classes to per-theme `--color-hl-*` tokens (base, keyword, string, number, comment,
   punctuation). highlight.js's own theme is deliberately **not** imported — its hard-coded colours bypass the

@@ -4,6 +4,8 @@ import { Link } from "react-router-dom";
 import { type ReactNode, createContext, useContext } from "react";
 import { slugifyHeading, specHeadingLabel } from "@spekjs/core/headings";
 import { rehypeHighlightNarrow } from "../utils/highlight";
+import { rehypeSpekMermaid, MERMAID_MARKER } from "../utils/mermaidBlocks";
+import { MermaidDiagram } from "./MermaidDiagram";
 import {
   rehypeSpekFoldSections,
   type FoldOptions,
@@ -309,6 +311,10 @@ export function MarkdownRenderer({ content, specTopics, idPrefix, fold, specShap
   //    requirement 的 id 都會變，而走 `extractHeadings`（直接解析原始 markdown）的 TOC 與 VS Code
   //    側欄仍然產出原本的 slug —— 兩邊從此指向不同的錨點，畫面上完全看不出來，只是連結再也跳不到。
   const rehypePlugins: NonNullable<Parameters<typeof ReactMarkdown>[0]["rehypePlugins"]> = [
+    // 3. 必須排在 highlighter 之前：mermaid fence 是圖，不是程式碼。先換掉整個 `<pre>`，
+    //    highlighter 就永遠看不到它，不必再把 tokenise 過的結果拆回來。它不碰任何 heading、
+    //    也不刪 heading，所以 heading-id 的 dedup counter 走訪順序不受影響。
+    rehypeSpekMermaid,
     // Syntax highlighting for fenced blocks with a language hint. Never auto-detects, so a language-less
     // fence stays plain. An unregistered language renders plain too, never throwing. It is orthogonal to
     // the heading/fold plugins below (it only touches `pre > code`), so its position ahead of them does
@@ -428,6 +434,18 @@ export function MarkdownRenderer({ content, specTopics, idPrefix, fold, specShap
                 {children}
               </code>
             );
+          },
+          // The element rehypeSpekMermaid leaves behind. Every other div passes through untouched —
+          // keying on the marker rather than on a custom tag name is what keeps this inside
+          // react-markdown's component map, which is typed to intrinsic elements only.
+          div(props) {
+            if (MERMAID_MARKER in props) {
+              // The plugin leaves exactly one text child, so children is the source verbatim.
+              const source = typeof props.children === "string" ? props.children : "";
+              return <MermaidDiagram source={source} />;
+            }
+            const { node: _node, ...rest } = props;
+            return <div {...rest} />;
           },
           pre({ children }) {
             return (
