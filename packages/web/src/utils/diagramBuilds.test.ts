@@ -1,61 +1,89 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 /**
- * Which builds draw diagrams, asserted against the build configs themselves.
+ * Which builds draw diagrams, and what that must not cost.
  *
- * This is a size guard, and it is here because the thing it protects is invisible in every other check:
- * Mermaid costs 5.23 MB inlined into a single-file bundle, on top of 719 KB. Nothing about a bundle that
- * is 8× too big fails a type-check, a lint or a test — it just lands in `docs/demo.html`, which is
- * committed to the repository, on the next release.
+ * Mermaid is about 5.2 MB. The risk it creates does not change with the delivery mechanism, but the
+ * thing worth guarding does: the builds no longer avoid Mermaid, they *split* it. So what this asserts
+ * is that it stays out of the **entry** bundle — the bytes every reader downloads before anything is
+ * on screen — and arrives only as chunks fetched when a document actually holds a diagram.
  *
- * Both mechanisms are asserted, because they do different jobs. The `define` decides what the reader
- * sees (source, calmly, rather than a load failure); the alias decides whether the bytes exist at all.
- * Dropping the alias and trusting tree-shaking to follow the flag through a dynamic import is the
- * regression this exists to catch — it would still behave correctly, and cost 5.23 MB.
+ * It is worth a test because nothing else fails when this regresses. An entry bundle eight times too
+ * big passes type-check, lint and every behavioural test; it just makes the editor panel slow to open
+ * and, for the demo, lands in a file committed to the repository.
  */
 
-const config = (name: string): string =>
-  readFileSync(fileURLToPath(new URL(`../../${name}`, import.meta.url)), "utf8");
+const webRoot = new URL("../../", import.meta.url);
+const config = (name: string): string => readFileSync(fileURLToPath(new URL(name, webRoot)), "utf8");
 
-/** The three single-file IIFE builds: no code splitting, so an import is inlined rather than deferred. */
-const SINGLE_FILE_BUILDS = [
-  "vite.webview.config.ts",
-  "vite.intellij.config.ts",
-  "vite.demo.config.ts",
-];
+/** Builds that draw: they split code, so Mermaid is a lazy chunk. */
+const DRAWING_BUILDS = ["vite.config.ts", "vite.webview.config.ts", "vite.intellij.config.ts"];
 
-test("the Web build draws diagrams", () => {
-  // A real ESM build, so Mermaid lands in lazy chunks a repository with no diagrams never fetches.
-  assert.match(config("vite.config.ts"), /__SPEK_DRAWS_DIAGRAMS__:\s*"true"/);
-});
+/** The demo is a single self-contained file, committed on every release — it cannot split. */
+const SOURCE_ONLY_BUILDS = ["vite.demo.config.ts"];
 
-test("no single-file build draws diagrams", () => {
-  for (const name of SINGLE_FILE_BUILDS) {
+test("every build that can split code draws diagrams", () => {
+  for (const name of DRAWING_BUILDS) {
     assert.match(
       config(name),
-      /__SPEK_DRAWS_DIAGRAMS__:\s*"false"/,
-      `${name} must not declare that it draws: it cannot code-split, so Mermaid would be inlined`,
+      /__SPEK_DRAWS_DIAGRAMS__:\s*"true"/,
+      `${name} should draw: it emits ES modules and its host can load chunks`,
     );
   }
 });
 
-test("every single-file build aliases mermaid away", () => {
-  for (const name of SINGLE_FILE_BUILDS) {
+test("a drawing build must not be IIFE", () => {
+  // IIFE cannot code-split, so `import("mermaid")` would be inlined into the entry — the 5.2 MB this
+  // guard exists to keep out. The webview and IntelliJ builds were IIFE until diagrams landed.
+  for (const name of DRAWING_BUILDS.filter((n) => n !== "vite.config.ts")) {
+    assert.match(config(name), /format:\s*"es"/, `${name} must emit ES modules to split Mermaid out`);
+    assert.equal(
+      /format:\s*"iife"/.test(config(name)),
+      false,
+      `${name} is IIFE, so Mermaid would be inlined into the entry`,
+    );
+  }
+});
+
+test("the demo does not draw, and excludes Mermaid outright", () => {
+  for (const name of SOURCE_ONLY_BUILDS) {
+    assert.match(config(name), /__SPEK_DRAWS_DIAGRAMS__:\s*"false"/, `${name} cannot split code`);
     assert.match(
       config(name),
       /alias:\s*\{\s*mermaid:/,
-      `${name} must alias mermaid to the stand-in, or 5.23 MB of it ships in one file`,
+      `${name} must alias Mermaid to the stand-in, or 5.2 MB ships in one committed file`,
     );
   }
 });
 
 test("the stand-in resolves to nothing", () => {
-  // If this ever grows an implementation, the alias stops being an exclusion.
-  const stub = readFileSync(fileURLToPath(new URL("./mermaidUnavailable.ts", import.meta.url)), "utf8");
+  const stub = readFileSync(fileURLToPath(new URL("mermaidUnavailable.ts", import.meta.url)), "utf8");
   assert.match(stub, /export default null;/);
   // Anchored to a statement, not the word: the module's comment explains what an inlined import costs.
   assert.equal(/^import\s/m.test(stub), false, "the stand-in must import nothing");
+});
+
+/**
+ * The one assertion against reality rather than configuration. Skipped when the build output is not
+ * present, so a plain `npm test` on a fresh clone does not fail on a missing artifact — CI and anyone
+ * who has run a build get the check.
+ */
+test("Mermaid is not in the webview entry bundle", (t) => {
+  const entry = fileURLToPath(new URL("../../../vscode/webview/assets/index.webview.js", import.meta.url));
+  if (!existsSync(entry)) return t.skip("webview not built; run npm run build:webview");
+  const text = readFileSync(entry, "utf8");
+  for (const marker of ["dagre", "cytoscape", "katex", "sequenceDiagram"]) {
+    assert.equal(
+      text.includes(marker),
+      false,
+      `"${marker}" is in the entry bundle, so Mermaid was inlined rather than split`,
+    );
+  }
+  // A generous ceiling: the entry was ~683 KB when diagrams landed, against ~5.9 MB inlined. This
+  // catches the inlining regression, not ordinary growth.
+  const bytes = statSync(entry).size;
+  assert.ok(bytes < 2_000_000, `webview entry is ${bytes} B; Mermaid has probably been inlined`);
 });

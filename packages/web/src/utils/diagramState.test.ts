@@ -150,3 +150,23 @@ test("there is no drawing to switch to, so the toggle is not offered", () => {
   const failed = run([{ type: "shown" }, { type: "drawFailed", reason: "nope", generation: 0 }]);
   assert.equal(canToggleSource(failed), false);
 });
+
+test("invalidation leaves an unseen diagram alone", () => {
+  // Reported in review: a theme toggle moved every idle diagram to `drawing`, drawing the whole
+  // document and loading the chunk for diagrams the reader had never scrolled to — and StrictMode's
+  // second effect run made that happen on mount in dev.
+  const state = diagramReducer(DRAWING_BUILD, { type: "invalidated" });
+  assert.equal(state.status.kind, "idle");
+  assert.deepEqual(state, DRAWING_BUILD);
+});
+
+test("an unseen diagram still draws when it is finally shown", () => {
+  // The other half: staying idle must not mean never drawing.
+  const after = run([{ type: "invalidated" }, { type: "shown" }]);
+  assert.equal(after.status.kind, "drawing");
+});
+
+test("invalidation still redraws a diagram that has been drawn", () => {
+  const drawn = run([{ type: "shown" }, { type: "drawSucceeded", svg: "<svg/>", generation: 0 }]);
+  assert.equal(diagramReducer(drawn, { type: "invalidated" }).status.kind, "drawing");
+});

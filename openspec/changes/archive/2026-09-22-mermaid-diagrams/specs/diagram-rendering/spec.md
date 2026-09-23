@@ -208,25 +208,29 @@ load: nothing has gone wrong, and the source is the file the reader came to read
 SHALL match what is actually available — a surface with no drawing to switch to SHALL NOT offer a switch
 that leads nowhere.
 
-This exists because the constraint is a build format, not a preference. spek ships one application to
-four surfaces, and three of them — the VS Code webview, the IntelliJ webview and `docs/demo.html` — are
-single files that cannot split code. A drawing implementation is *inlined* into each, measured at 5.23 MB
-on top of a 719 KB bundle, and `docs/demo.html` is committed to the repository on every release. Paying
-that in three places to draw a picture whose text is already on screen is the wrong trade; showing the
-source there is a smaller product, honestly stated, rather than a bug.
+This exists because the constraint is a build format, not a host. A surface that can split code draws:
+the drawing implementation arrives as a chunk fetched only when a document holds a diagram, so a reader
+who opens no diagram downloads none of it. The Web app, the VS Code webview and the IntelliJ tool window
+are all of that kind — a webview can load further files from its own resource root, and the IntelliJ
+built-in server already serves them.
+
+`docs/demo.html` is the exception, and the reason is not the host but the artifact: it is a **single
+self-contained file**, committed to the repository on every release. It cannot split, so the
+implementation would be inlined — measured at 5.23 MB on top of a 719 KB bundle. Showing the source
+there is a smaller product, honestly stated, rather than a bug.
 
 The drawing implementation SHALL be absent from the bundles of surfaces that do not draw, not merely
 unused by them. An implementation that ships and is never called costs exactly what it would cost if it
 were called, which is the entire reason this requirement exists.
 
-#### Scenario: A surface that draws, draws
+#### Scenario: A surface that can split code draws
 
-- **WHEN** a document containing a diagram is viewed on a surface built with drawing
+- **WHEN** a document containing a diagram is viewed on the Web app, the VS Code webview or the IntelliJ tool window
 - **THEN** the diagram is drawn
 
-#### Scenario: A surface that does not draw shows the source
+#### Scenario: A single-file surface shows the source
 
-- **WHEN** a document containing a diagram is viewed on a surface built without drawing
+- **WHEN** a document containing a diagram is viewed in `docs/demo.html`
 - **THEN** the diagram's source is shown, verbatim and selectable
 
 #### Scenario: Not drawing is not reported as a failure
@@ -266,5 +270,5 @@ a local file is a different product from the one this is.
 
 #### Scenario: No external request is made
 
-- **WHEN** `docs/demo.html` is opened from disk and a page containing a diagram is viewed
-- **THEN** it renders, and no request is issued to any external host
+- **WHEN** `docs/demo.html` is opened from disk, or a diagram is drawn in either editor host
+- **THEN** it renders from resources the build ships, and no request is issued to any external host

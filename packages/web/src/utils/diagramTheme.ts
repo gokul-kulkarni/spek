@@ -36,7 +36,13 @@ export type DiagramColorRole =
   /** A line or border that is the sole carrier of its meaning — an edge, a node outline. 1.4.11: 3:1. */
   | { kind: "graphic" }
   /** A fill behind other marks. It owes nothing itself; what is drawn on it is measured against it. */
-  | { kind: "surface"; reason: string };
+  | { kind: "surface"; reason: string }
+  /**
+   * Text drawn on another token's solid fill rather than on a page surface — `on` names that token.
+   * Measured against it, not against the page: a sequence `autonumber` sits on a filled circle, and
+   * measuring it against the background it never touches is how it reached about 2.1:1 unnoticed.
+   */
+  | { kind: "textOn"; on: string };
 
 export interface DiagramColor {
   /** The `--color-*` token, without the prefix, exactly as `global.css` spells it. */
@@ -55,6 +61,11 @@ const graphic = (token: string, label: string): DiagramColor => ({
 const surface = (token: string, label: string, reason: string): DiagramColor => ({
   token,
   role: { kind: "surface", reason },
+  label,
+});
+const textOn = (token: string, on: string, label: string): DiagramColor => ({
+  token,
+  role: { kind: "textOn", on },
   label,
 });
 
@@ -98,7 +109,9 @@ export const DIAGRAM_COLORS: Record<string, DiagramColor> = {
   noteTextColor: text("text-primary", "note body"),
   labelTextColor: text("text-primary", "sequence loop label text"),
   classText: text("text-primary", "class diagram member text"),
-  sequenceNumberColor: text("text-primary", "sequence message number"),
+  // Drawn inside a circle filled with signalColor, not on the page. As text-primary on that fill it
+  // measured about 2.1:1 dark and 2.4:1 light; a surface token on it clears the floor in both.
+  sequenceNumberColor: textOn("bg-primary", "text-secondary", "sequence autonumber, on the signal circle"),
   altBackground: surface("bg-secondary", "sequence alt block backing", "a fill"),
 
   // --- Graphics that carry their own meaning ---
@@ -119,6 +132,29 @@ export const DIAGRAM_COLORS: Record<string, DiagramColor> = {
   actorLineColor: graphic("fold-rule", "sequence lifeline"),
   labelBoxBorderColor: graphic("fold-rule", "sequence loop label outline"),
   activationBorderColor: graphic("fold-rule", "sequence activation bar outline"),
+
+  // --- Gantt. Every one of these is a hard-coded literal in Mermaid's base theme, so a dark gantt
+  // drew light text on `lightgrey` at about 1.1:1 until they were declared here. ---
+  altSectionBkgColor: surface("bg-secondary", "alternating gantt section band", "a fill"),
+  excludeBkgColor: surface("bg-tertiary", "excluded gantt period", "a fill"),
+  doneTaskBkgColor: surface("bg-tertiary", "completed gantt task fill", "a fill; the task label is measured against it"),
+  critBkgColor: graphic("status-error", "critical gantt task fill"),
+  gridColor: graphic("fold-rule", "gantt grid line"),
+  vertLineColor: graphic("fold-rule", "gantt section divider"),
+  doneTaskBorderColor: graphic("fold-rule", "completed gantt task outline"),
+  critBorderColor: graphic("status-error", "critical gantt task outline"),
+  todayLineColor: graphic("accent", "gantt today marker"),
+  taskTextClickableColor: text("accent", "clickable gantt task label"),
+
+  // --- Pie, ER, architecture. Slice and cell separators, and edges that state a dependency. ---
+  pieStrokeColor: graphic("fold-rule", "pie slice separator"),
+  pieOuterStrokeColor: graphic("fold-rule", "pie outer edge"),
+  attributeBackgroundColorOdd: surface("bg-secondary", "ER attribute row", "a fill"),
+  attributeBackgroundColorEven: surface("bg-tertiary", "ER attribute row", "a fill"),
+  archEdgeColor: graphic("text-secondary", "architecture edge"),
+  archEdgeArrowColor: graphic("text-secondary", "architecture arrowhead"),
+  archGroupBorderColor: graphic("fold-rule", "architecture group outline"),
+  wardleyEvolutionColor: graphic("fold-rule", "Wardley evolution divider"),
 };
 
 /**
@@ -134,6 +170,25 @@ export const DECLARED_DEFAULTS: Record<string, string> = {
   darkMode:
     "not a colour — a flag telling Mermaid which direction to derive any value this table does not " +
     "set, so that a derivation still lands on the right side of the page",
+  // The event-model block palette. Unlike everything above, hue here IS the information: which pastel a
+  // block carries is what says whether it is a command, an event, a read model, a processor or UI. This
+  // theme has no categorical ramp to map them onto, and collapsing five hues onto one token would erase
+  // the distinction the diagram exists to draw. They are left as Mermaid's own, with the limitation
+  // stated rather than hidden: they are light-theme pastels, so an event-model diagram is legible in the
+  // light theme and poor in the dark one. Giving this project a categorical ramp is the fix, and it is a
+  // change of its own — see the note in CLAUDE.md.
+  emUiFill: "categorical hue carries the block kind; no categorical ramp exists to map it onto",
+  emUiStroke: "outline of the above",
+  emProcessorFill: "categorical hue carries the block kind",
+  emProcessorStroke: "outline of the above",
+  emReadModelFill: "categorical hue carries the block kind",
+  emReadModelStroke: "outline of the above",
+  emCommandFill: "categorical hue carries the block kind",
+  emCommandStroke: "outline of the above",
+  emEventFill: "categorical hue carries the block kind",
+  emEventStroke: "outline of the above",
+  emSwimlaneBackgroundOdd: "event-model swimlane banding, alongside the block palette above",
+  emSwimlaneBackgroundStroke: "event-model swimlane banding, alongside the block palette above",
 };
 
 /** The `--color-*` custom property a table entry reads. */

@@ -1,7 +1,12 @@
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Link } from "react-router-dom";
-import { type ReactNode, createContext, useContext } from "react";
+import {
+  type ComponentPropsWithoutRef,
+  type ReactNode,
+  createContext,
+  useContext,
+} from "react";
 import { slugifyHeading, specHeadingLabel } from "@spekjs/core/headings";
 import { rehypeHighlightNarrow } from "../utils/highlight";
 import { rehypeSpekMermaid, MERMAID_MARKER } from "../utils/mermaidBlocks";
@@ -300,20 +305,44 @@ function StrongWithKeywords({ children }: { children: ReactNode }) {
 // 降級後刻意停在「不低於 h4」：h3 是 text-lg/semibold/primary、h4 是 text-base/semibold/secondary，
 // 這裡與 h4 同級再加上大寫與字距，所以排序是 h3 > h2 ≥ h4。若再往下降成 text-xs muted，h2 就會比
 // 它所統括的 h4 還輕 —— 那正是這次要修的倒置，只是往下挪了一層。
+/**
+ * The `div` override, at module scope on purpose.
+ *
+ * Defined inline in the `components` object it would be a **new component type on every render**, and
+ * React unmounts and remounts a subtree whose type changed. Every watcher refresh, sort change or
+ * theme toggle would therefore throw away each fenced diagram's drawing, zoom, pan and source toggle
+ * and draw it again from scratch. (A `.mmd` artifact tab does not go through here, so it never showed
+ * the symptom — which is what made this easy to miss.)
+ *
+ * It keys on the marker attribute rather than a custom tag name because react-markdown's component map
+ * is typed to intrinsic elements only. Every other div passes through untouched.
+ */
+function DivOrDiagram(props: ComponentPropsWithoutRef<"div"> & { node?: unknown }) {
+  if (MERMAID_MARKER in props) {
+    // rehypeSpekMermaid leaves exactly one text child, so children is the source verbatim.
+    const source = typeof props.children === "string" ? props.children : "";
+    return <MermaidDiagram source={source} />;
+  }
+  const { node: _node, ...rest } = props;
+  return <div {...rest} />;
+}
+
 const H2_CONTENT = "text-xl font-bold mt-6 mb-3 text-text-primary border-b border-border pb-2 scroll-mt-20";
 const H2_STRUCTURAL = "text-base font-semibold uppercase tracking-wide mt-6 mb-3 text-text-secondary scroll-mt-20";
 
 export function MarkdownRenderer({ content, specTopics, idPrefix, fold, specShaped }: MarkdownRendererProps) {
-  // 順序不可調換，而且有兩個理由：
+  // 順序不可調換，而且有三個理由：
   //
   // 1. heading id 必須在還是扁平樹時指派，否則 dedup counter 看到的走訪順序會變。
   // 2. id 是從 heading 的文字算出來的，所以關鍵字**必須**在 id 指派之後才剝。反過來的話，每個
   //    requirement 的 id 都會變，而走 `extractHeadings`（直接解析原始 markdown）的 TOC 與 VS Code
   //    側欄仍然產出原本的 slug —— 兩邊從此指向不同的錨點，畫面上完全看不出來，只是連結再也跳不到。
+  // 3. The mermaid plugin must run before the highlighter: a mermaid fence is a diagram, not code.
+  //    Replacing the whole `<pre>` first means the highlighter never sees it, so there is no
+  //    tokenised markup to take apart again. It touches no heading and removes none, so the
+  //    heading-id dedup counter walks the same tree either way.
   const rehypePlugins: NonNullable<Parameters<typeof ReactMarkdown>[0]["rehypePlugins"]> = [
-    // 3. 必須排在 highlighter 之前：mermaid fence 是圖，不是程式碼。先換掉整個 `<pre>`，
-    //    highlighter 就永遠看不到它，不必再把 tokenise 過的結果拆回來。它不碰任何 heading、
-    //    也不刪 heading，所以 heading-id 的 dedup counter 走訪順序不受影響。
+    // Reason 3 above.
     rehypeSpekMermaid,
     // Syntax highlighting for fenced blocks with a language hint. Never auto-detects, so a language-less
     // fence stays plain. An unregistered language renders plain too, never throwing. It is orthogonal to
@@ -435,18 +464,7 @@ export function MarkdownRenderer({ content, specTopics, idPrefix, fold, specShap
               </code>
             );
           },
-          // The element rehypeSpekMermaid leaves behind. Every other div passes through untouched —
-          // keying on the marker rather than on a custom tag name is what keeps this inside
-          // react-markdown's component map, which is typed to intrinsic elements only.
-          div(props) {
-            if (MERMAID_MARKER in props) {
-              // The plugin leaves exactly one text child, so children is the source verbatim.
-              const source = typeof props.children === "string" ? props.children : "";
-              return <MermaidDiagram source={source} />;
-            }
-            const { node: _node, ...rest } = props;
-            return <div {...rest} />;
-          },
+          div: DivOrDiagram,
           pre({ children }) {
             return (
               <pre className="bg-bg-tertiary border border-border rounded-lg p-4 text-sm overflow-x-auto mb-4 leading-relaxed">

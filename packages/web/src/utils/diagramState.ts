@@ -86,6 +86,11 @@ export function diagramReducer(state: DiagramState, event: DiagramEvent): Diagra
     case "invalidated":
       // Nothing to redraw on a build that does not draw: the source it shows is already current.
       if (state.status.kind === "unavailable") return state;
+      // An `idle` diagram has never been scrolled to, so there is nothing stale to replace. Moving it
+      // to `drawing` makes a theme toggle — or an edit, or StrictMode's second mount in dev — draw
+      // every diagram in the document at once and pull in the chunk, which is exactly the work the
+      // observer exists to defer. It stays idle and draws when the reader reaches it.
+      if (state.status.kind === "idle") return state;
       // Straight back to drawing, not to idle: the element is already displayed, so waiting for another
       // intersection would leave a diagram that never redraws for a reader who has not scrolled. The
       // generation bump is what makes the in-flight result droppable.
