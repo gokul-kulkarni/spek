@@ -90,6 +90,14 @@ jobs:
   action-smoke:
     name: Composite action smoke test
     runs-on: ubuntu-latest
+    # Inputs for the hostile run. Each embeds commands that would leave a pwned-* canary in the
+    # workspace if any shell ever parsed the value (#56); the title's use ../ because the action
+    # reaches it after `cd .spek-builder`. Referenced through ${{ env.* }} in `with:` and as plain
+    # variables in scripts — never interpolated into a script.
+    env:
+      HOSTILE_REPO_PATH: '-repo "q" $(touch pwned-repo) `touch pwned-repo-bt` it''s'
+      HOSTILE_OUTPUT_PATH: '-out "d" $(touch pwned-out)/it''s `touch pwned-out-bt`.html'
+      HOSTILE_TITLE: 'He said "hi" $(touch ../pwned-title) `touch ../pwned-title-bt` & <b>R&amp;D</b>'
     steps:
       - uses: actions/checkout@v7
 
@@ -109,10 +117,12 @@ jobs:
       # the action stopped producing ui's dist and shipped broken for a full day with every output
       # still populated.
       - name: Assert the action produced real output
+        # Outputs arrive through env, not interpolation: the hostile run below produces paths
+        # containing quotes, and an interpolated one would break this script rather than the action.
+        env:
+          HTML: ${{ steps.spek.outputs.html-path }}
+          BADGES: ${{ steps.spek.outputs.badges-path }}
         run: |
-          HTML='${{ steps.spek.outputs.html-path }}'
-          BADGES='${{ steps.spek.outputs.badges-path }}'
-
           if [ -z "$HTML" ]; then echo "::error::html-path output is empty"; exit 1; fi
           if [ ! -s "$HTML" ]; then echo "::error::no file at html-path: $HTML"; exit 1; fi
           echo "html-path: $HTML ($(wc -c <"$HTML") bytes)"
@@ -122,3 +132,70 @@ jobs:
           count=$(find "$BADGES" -name '*.svg' -size +0c | wc -l)
           if [ "$count" -eq 0 ]; then echo "::error::no non-empty badge in $BADGES"; exit 1; fi
           echo "badges-path: $BADGES ($count badges)"
+
+      # Inputs must reach the action's shell steps as data (#56). A symlink to this repository
+      # stands in for a hostile repo-path, so the run still scans real content.
+      - name: Create a hostile repo-path
+        run: ln -s -- . "$HOSTILE_REPO_PATH"
+
+      - name: Run the action with shell-hostile inputs
+        id: hostile
+        uses: ./
+        with:
+          spek-version: ${{ github.sha }}
+          repo-path: ${{ env.HOSTILE_REPO_PATH }}
+          output-path: ${{ env.HOSTILE_OUTPUT_PATH }}
+          title: ${{ env.HOSTILE_TITLE }}
+          generate-badges: "true"
+
+      - name: Assert hostile inputs arrived literally and ran nothing
+        env:
+          HTML: ${{ steps.hostile.outputs.html-path }}
+          BADGES: ${{ steps.hostile.outputs.badges-path }}
+        run: |
+          set -euo pipefail
+
+          expected_html=$(realpath -- "$HOSTILE_OUTPUT_PATH")
+          if [ "$HTML" != "$expected_html" ]; then
+            echo "::error::html-path is [$HTML], expected [$expected_html]"; exit 1
+          fi
+          if [ ! -s "$HTML" ]; then echo "::error::no file at html-path: [$HTML]"; exit 1; fi
+          echo "html-path is the literal output-path: [$HTML]"
+
+          # The build escapes &, < and > in the title; html.escape(quote=False) escapes exactly those.
+          expected_title=$(python3 -c 'import html, os; print("<title>" + html.escape(os.environ["HOSTILE_TITLE"], quote=False) + "</title>")')
+          if ! grep -qF -- "$expected_title" "$HTML"; then
+            echo "::error::the title did not arrive literally; the page has:"
+            grep -o '<title>.*</title>' "$HTML" | head -1
+            exit 1
+          fi
+          echo "title arrived literally: $expected_title"
+
+          count=$(find "$BADGES" -name '*.svg' -size +0c | wc -l)
+          if [ "$count" -eq 0 ]; then echo "::error::no non-empty badge in [$BADGES]"; exit 1; fi
+          echo "badges-path: [$BADGES] ($count badges)"
+
+          canaries=$(find "$GITHUB_WORKSPACE" -maxdepth 3 -name 'pwned-*')
+          if [ -n "$canaries" ]; then echo "::error::a command inside an input was executed: $canaries"; exit 1; fi
+          echo "no canary: no command inside any input ran"
+
+      # Last, because a failed composite action skips its own cleanup. Unchecked, this value writes
+      # a second html-path line to $GITHUB_OUTPUT and the later line wins — a forged output.
+      - name: Run the action with an output-path that would forge an output
+        id: forged
+        continue-on-error: true
+        uses: ./
+        with:
+          spek-version: ${{ github.sha }}
+          output-path: "forged-out/x\nhtml-path=/forged.html"
+
+      - name: Assert the forging run failed and forged nothing
+        env:
+          OUTCOME: ${{ steps.forged.outcome }}
+          FORGED_HTML: ${{ steps.forged.outputs.html-path }}
+        run: |
+          if [ "$OUTCOME" != "failure" ]; then
+            echo "::error::expected the forging run to fail; outcome was $OUTCOME, html-path [$FORGED_HTML]"; exit 1
+          fi
+          if [ "$FORGED_HTML" = "/forged.html" ]; then echo "::error::html-path was forged"; exit 1; fi
+          echo "forging run failed as required (html-path: [$FORGED_HTML])"
