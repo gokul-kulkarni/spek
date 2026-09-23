@@ -40,10 +40,25 @@ pins `spek-version: ${{ github.sha }}` — the action checks out `spekhq/spek` a
 copy, so the default `master` would test master's implementation and go green on a PR that breaks the action.
 
 **What it covers**: the action's own build chain produces output. That is the failure that shipped before.
-**What it does not**: any input combination other than the one it runs (`repo-path`, `output-path`, `title`,
-`spek-version` pinned to a tag), the generated HTML's *content*, and behavior on a consumer's repo layout. A
-change to those still needs manual verification — a temporary `workflow_dispatch` workflow with
-`uses: spekhq/spek@master`, asserting the outputs, then removed.
+It also runs the action twice more:
+- **Hostile inputs**: `repo-path`, `output-path` and `title` carry quotes, `$(…)`, backticks and a leading
+  `-`, each embedding a command that would leave a `pwned-*` canary. The job asserts every value arrived
+  literally and that no canary exists.
+- **Forged output**: an `output-path` whose newline would write a second `html-path=` line to
+  `$GITHUB_OUTPUT` must fail.
+
+Both caught the old interpolating `action.yml` (#56). **The action's shell steps take inputs only through
+`env:`** — a `${{ inputs.* }}` inside a `run:` is shell source, and the smoke job's own steps read outputs
+the same way. The job's `name:` is a required check, which is why these are steps inside it and not a new
+job.
+
+**What it does not**: `spek-version` pinned to a tag, the generated HTML's *content*, and behavior on a
+consumer's repo layout. (The HTML's *structure* it does cover: `build-demo.ts` fails on a page that would not
+parse back as written — see `build:demo` below.) A change to those still needs manual verification — a
+temporary workflow asserting the outputs, then removed: on the PR branch with `uses: ./` and
+`spek-version: ${{ github.sha }}` so it runs before merge (as #54's fix did), or after merge with
+`uses: spekhq/spek@master`. The action definition itself comes from the ref a consumer `uses:`, not from
+`spek-version`, so an `action.yml` fix reaches `@v1` users only when a release moves the tag.
 
 - Precedent: moving `@spekjs/ui`'s build from `prepare` (install-time) to `prepublishOnly` (publish-time) made the
   action's ui build **silently vanish** — it relied on `npm ci` triggering `prepare` to get ui dist. The Marketplace
@@ -76,7 +91,7 @@ packages/
 ├── web/        # @spekjs/web — server/ (Express API) + src/ (React SPA + API adapters)
 ├── vscode/     # spek-vscode — src/ (extension.ts, panel.ts, handler.ts) + webview/ (from web build:webview)
 └── intellij/   # spek-intellij — src/main/kotlin/com/spek/intellij/ + resources/webview/ (from web build:intellij)
-scripts/        # build-demo.ts, generate-badges.ts
+scripts/        # build-demo.ts (demo-html.ts = page assembly + structural check), generate-badges.ts
 docs/           # demo.html (Pages), prd.md, feature-ideas.md
 .agents/skills/ # skill sources; .claude/skills/ are symlinks to them
 ```
@@ -93,7 +108,7 @@ npm run build:demo       # standalone demo (docs/demo.html; needs NODE_ENV=produ
 npm run build:intellij   # IntelliJ webview assets
 npm run type-check       # type-check core + ui + web + vscode + scripts/ (tests included)
 npm run lint             # ESLint over every package's src, web's server, and scripts/
-npm test                 # core + ui + web tests
+npm test                 # core + ui + web + scripts/ tests
 ```
 
 **CI runs exactly these scripts** (`.github/workflows/ci.yml`, on `pull_request` + `push:[master]`), plus
@@ -121,6 +136,20 @@ Schema enumeration reads the machine, and **the script guards this itself** — 
 schemas aside by hand; another machine-dependent source belongs in that guard, not in a note here.
 
 Still unfiltered: `specs[].path` carries the builder's absolute repo path — predates schemas, separate cleanup.
+
+**The page is assembled by `scripts/demo-html.ts`, and a page that would not parse back as written fails the
+build.** Where an inline element ends is the HTML tokenizer's call, not ours: an artifact holding `</script>`
+truncated the data script, and `<!--` followed by `<script>` makes it swallow the bundle after it — both built
+"successfully" (#54). So the payload escapes every `<` in its JSON and the title is HTML-escaped, which means no
+content can trip the check; then the assembled document is parsed (parse5) and must hold exactly the
+title / script / style elements written, with their text, and the first divergence throws, naming the part,
+before anything is written. For the JS/CSS bundles that check is the **only** guard — they cannot be re-encoded
+without changing what they mean. **Don't replace it with a substring ban**: today's bundle holds `<!--`, `-->`
+and `<script` in inert positions (React DOM's `"<script><\/script>"`, highlight.js's HTML grammar), so a ban
+fails every build; the danger is a sequence of tokenizer states, and parse5 is the rule. The module is kept free
+of `packages/core/dist` imports and import-time side effects, which is what lets `npm test` run it without a core
+build. This repo's own payload carries the hostile forms (the archived `escape-demo-inline-payload` artifacts),
+so every demo build and smoke run exercises the escape on real content.
 
 **`runIde` blocks on two one-time dialogs in a fresh sandbox** (the JetBrains agreement, then Trust Project), which
 matters on any machine without someone to click them — CI included. `./gradlew runIde -Pspek.headlessIde` sets
