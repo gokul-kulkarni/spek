@@ -40,12 +40,25 @@ pins `spek-version: ${{ github.sha }}` — the action checks out `spekhq/spek` a
 copy, so the default `master` would test master's implementation and go green on a PR that breaks the action.
 
 **What it covers**: the action's own build chain produces output. That is the failure that shipped before.
-**What it does not**: any input combination other than the one it runs (`repo-path`, `output-path`, `title`,
-`spek-version` pinned to a tag), the generated HTML's *content*, and behavior on a consumer's repo layout. (The
-HTML's *structure* it does now cover: `build-demo.ts` fails on a page that would not parse back as written — see
-`build:demo` below.) A change to those still needs manual verification — a temporary workflow asserting the
-outputs, then removed: on the PR branch with `uses: ./` and `spek-version: ${{ github.sha }}` so it runs before
-merge (as #54's fix did), or after merge with `uses: spekhq/spek@master`.
+It also runs the action twice more:
+- **Hostile inputs**: `repo-path`, `output-path` and `title` carry quotes, `$(…)`, backticks and a leading
+  `-`, each embedding a command that would leave a `pwned-*` canary. The job asserts every value arrived
+  literally and that no canary exists.
+- **Forged output**: an `output-path` whose newline would write a second `html-path=` line to
+  `$GITHUB_OUTPUT` must fail.
+
+Both caught the old interpolating `action.yml` (#56). **The action's shell steps take inputs only through
+`env:`** — a `${{ inputs.* }}` inside a `run:` is shell source, and the smoke job's own steps read outputs
+the same way. The job's `name:` is a required check, which is why these are steps inside it and not a new
+job.
+
+**What it does not**: `spek-version` pinned to a tag, the generated HTML's *content*, and behavior on a
+consumer's repo layout. (The HTML's *structure* it does cover: `build-demo.ts` fails on a page that would not
+parse back as written — see `build:demo` below.) A change to those still needs manual verification — a
+temporary workflow asserting the outputs, then removed: on the PR branch with `uses: ./` and
+`spek-version: ${{ github.sha }}` so it runs before merge (as #54's fix did), or after merge with
+`uses: spekhq/spek@master`. The action definition itself comes from the ref a consumer `uses:`, not from
+`spek-version`, so an `action.yml` fix reaches `@v1` users only when a release moves the tag.
 
 - Precedent: moving `@spekjs/ui`'s build from `prepare` (install-time) to `prepublishOnly` (publish-time) made the
   action's ui build **silently vanish** — it relied on `npm ci` triggering `prepare` to get ui dist. The Marketplace

@@ -245,7 +245,7 @@ There is no single "app" to boot — each surface is verified on its own:
 3. **IntelliJ** — `./gradlew runIde`; confirm the tool window, tree panel toggle, and theme sync.
 4. **Demo** — `npm run build:demo` (with `NODE_ENV=production`) and open `docs/demo.html`
    standalone.
-5. **GitHub Action** — CI smoke-tests the action's build chain for one input combination, and the
-   build itself fails on a page that would not parse back as written. Other inputs, the HTML's
-   content, and consumer repo layouts still need manual verification (see the `action.yml` note in
-   `CLAUDE.md`).
+5. **GitHub Action** — CI smoke-tests the action's build chain with its default inputs and with
+   shell-hostile ones, and the build itself fails on a page that would not parse back as written.
+   A pinned `spek-version`, the HTML's content, and consumer repo layouts still need manual
+   verification (see the `action.yml` note in `CLAUDE.md`).
