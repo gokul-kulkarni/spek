@@ -90,32 +90,54 @@ runs:
       env:
         OPENSPEC_TELEMETRY: "0"
         DO_NOT_TRACK: "1"
+        # Inputs reach the script as environment variables, never as text substituted into it: an
+        # interpolated input becomes shell source, so a quote in a title broke the build and $(...)
+        # in any input ran in the consumer's job (#56). `--` keeps a leading "-" from reading as an
+        # option.
+        REPO_PATH_INPUT: ${{ inputs.repo-path }}
+        OUTPUT_PATH_INPUT: ${{ inputs.output-path }}
+        TITLE_INPUT: ${{ inputs.title }}
       run: |
-        REPO_DIR=$(realpath "${{ inputs.repo-path }}")
-        OUTPUT_DIR=$(dirname "${{ inputs.output-path }}")
-        mkdir -p "$OUTPUT_DIR"
-        OUTPUT=$(realpath "${{ inputs.output-path }}")
+        REPO_DIR=$(realpath -- "$REPO_PATH_INPUT")
+        OUTPUT_DIR=$(dirname -- "$OUTPUT_PATH_INPUT")
+        mkdir -p -- "$OUTPUT_DIR"
+        OUTPUT=$(realpath -- "$OUTPUT_PATH_INPUT")
+        # A newline would start another name=value line in $GITHUB_OUTPUT — a forged output. The
+        # value is not echoed: printed, the same newline could start a workflow command.
+        if [[ "$OUTPUT" == *$'\n'* ]]; then
+          echo "::error::output-path resolves to a path containing a newline, which cannot be reported as an output"
+          exit 1
+        fi
         cd .spek-builder
         npx tsx scripts/build-demo.ts \
           --repo-dir "$REPO_DIR" \
           --output "$OUTPUT" \
-          --title "${{ inputs.title }}"
-        echo "html-path=$OUTPUT" >> "$GITHUB_OUTPUT"
+          --title "$TITLE_INPUT"
+        printf 'html-path=%s\n' "$OUTPUT" >> "$GITHUB_OUTPUT"
 
     - name: Generate badges
       id: badges
       if: ${{ inputs.generate-badges == 'true' }}
       shell: bash
+      # Same rules as the build step: inputs through env, `--` for path utilities, and no newline
+      # written to $GITHUB_OUTPUT.
+      env:
+        REPO_PATH_INPUT: ${{ inputs.repo-path }}
+        OUTPUT_PATH_INPUT: ${{ inputs.output-path }}
       run: |
-        REPO_DIR=$(realpath "${{ inputs.repo-path }}")
-        BADGES_DIR=$(dirname "${{ inputs.output-path }}")/badges
-        mkdir -p "$BADGES_DIR"
-        BADGES_DIR=$(realpath "$BADGES_DIR")
+        REPO_DIR=$(realpath -- "$REPO_PATH_INPUT")
+        BADGES_DIR=$(dirname -- "$OUTPUT_PATH_INPUT")/badges
+        mkdir -p -- "$BADGES_DIR"
+        BADGES_DIR=$(realpath -- "$BADGES_DIR")
+        if [[ "$BADGES_DIR" == *$'\n'* ]]; then
+          echo "::error::output-path resolves to a badges directory containing a newline, which cannot be reported as an output"
+          exit 1
+        fi
         cd .spek-builder
         npx tsx scripts/generate-badges.ts \
           --repo-dir "$REPO_DIR" \
           --output-dir "$BADGES_DIR"
-        echo "badges-path=$BADGES_DIR" >> "$GITHUB_OUTPUT"
+        printf 'badges-path=%s\n' "$BADGES_DIR" >> "$GITHUB_OUTPUT"
 
     - name: Cleanup spek builder
       shell: bash
